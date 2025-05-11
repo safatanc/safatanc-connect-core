@@ -1,4 +1,4 @@
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, NaiveDateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 use uuid::Uuid;
@@ -18,9 +18,9 @@ pub struct OAuthProvider {
     pub scope: String,
     pub is_active: bool,
     pub icon_url: Option<String>,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
-    pub deleted_at: Option<DateTime<Utc>>,
+    pub created_at: NaiveDateTime,
+    pub updated_at: NaiveDateTime,
+    pub deleted_at: Option<NaiveDateTime>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
@@ -34,11 +34,11 @@ pub struct UserOAuthConnection {
     pub avatar_url: Option<String>,
     pub access_token: Option<String>,
     pub refresh_token: Option<String>,
-    pub expires_at: Option<DateTime<Utc>>,
+    pub expires_at: Option<NaiveDateTime>,
     pub raw_user_info: Option<serde_json::Value>,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
-    pub deleted_at: Option<DateTime<Utc>>,
+    pub created_at: NaiveDateTime,
+    pub updated_at: NaiveDateTime,
+    pub deleted_at: Option<NaiveDateTime>,
 }
 
 #[derive(Debug, Serialize)]
@@ -93,7 +93,7 @@ pub struct OAuthUrlResponse {
     pub state: String,
 }
 
-// Implementasi From trait untuk konversi dari OAuthProvider ke OAuthProviderResponse
+// Implementation of From trait for converting from OAuthProvider to OAuthProviderResponse
 impl From<OAuthProvider> for OAuthProviderResponse {
     fn from(provider: OAuthProvider) -> Self {
         Self {

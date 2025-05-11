@@ -1,4 +1,4 @@
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, NaiveDateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 use uuid::Uuid;
@@ -9,10 +9,10 @@ pub struct VerificationToken {
     pub user_id: Option<Uuid>,
     pub token: String,
     pub token_type: String,
-    pub expires_at: DateTime<Utc>,
-    pub used_at: Option<DateTime<Utc>>,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
+    pub expires_at: NaiveDateTime,
+    pub used_at: Option<NaiveDateTime>,
+    pub created_at: NaiveDateTime,
+    pub updated_at: NaiveDateTime,
 }
 
 #[derive(Debug, Serialize)]
@@ -20,7 +20,7 @@ pub struct VerificationTokenResponse {
     pub id: Uuid,
     pub token: String,
     pub token_type: String,
-    pub expires_at: DateTime<Utc>,
+    pub expires_at: NaiveDateTime,
 }
 
 #[derive(Debug, Deserialize)]
@@ -40,7 +40,7 @@ pub struct VerifyTokenDto {
 pub const TOKEN_TYPE_EMAIL_VERIFICATION: &str = "email_verification";
 pub const TOKEN_TYPE_PASSWORD_RESET: &str = "password_reset";
 
-// Implementasi From trait untuk konversi dari VerificationToken ke VerificationTokenResponse
+// Implementation of From trait for converting from VerificationToken to VerificationTokenResponse
 impl From<VerificationToken> for VerificationTokenResponse {
     fn from(token: VerificationToken) -> Self {
         Self {

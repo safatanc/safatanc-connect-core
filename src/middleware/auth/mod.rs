@@ -24,22 +24,22 @@ pub async fn require_auth(
 ) -> Result<Response, AppError> {
     // Extract the token from the Authorization header
     let token = extract_token_from_headers(&request)
-        .ok_or_else(|| AppError::Authentication("Token tidak ditemukan".into()))?;
+        .ok_or_else(|| AppError::Authentication("Token not found".into()))?;
 
     // Validate the token and extract claims
     let claims = token_service.verify_token(&token)?;
 
     // Check if user still exists and is active
     let user_id = Uuid::parse_str(&claims.sub)
-        .map_err(|_| AppError::Authentication("Token berisi user ID yang tidak valid".into()))?;
+        .map_err(|_| AppError::Authentication("Token contains invalid user ID".into()))?;
 
     let user =
         repos.user().find_by_id(user_id).await.map_err(|_| {
-            AppError::Authentication("User tidak ditemukan atau tidak aktif".into())
+            AppError::Authentication("User not found or inactive".into())
         })?;
 
     if !user.is_active {
-        return Err(AppError::Authentication("Akun tidak aktif".into()));
+        return Err(AppError::Authentication("Account is not active".into()));
     }
 
     // Attach claims to request extensions

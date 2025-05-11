@@ -62,7 +62,7 @@ pub async fn list_users(
     // Only admin can list all users
     if claims.role != "admin" {
         return Err(crate::errors::AppError::Authorization(
-            "Akses ditolak. Hanya admin yang dapat melihat daftar pengguna.".into(),
+            "Access denied. Only administrators can view the user list.".into(),
         ));
     }
 
@@ -112,7 +112,7 @@ pub async fn get_user(
     // Users can only access their own data, unless they are admin
     if claims.sub != id.to_string() && claims.role != "admin" {
         return Err(crate::errors::AppError::Authorization(
-            "Akses ditolak. Anda hanya dapat melihat data diri sendiri.".into(),
+            "Access denied. You can only view your own data.".into(),
         ));
     }
 
@@ -134,7 +134,7 @@ pub async fn create_user(
     // Only admin can create users directly
     if claims.role != "admin" {
         return Err(crate::errors::AppError::Authorization(
-            "Akses ditolak. Hanya admin yang dapat membuat pengguna baru.".into(),
+            "Access denied. Only administrators can create new users.".into(),
         ));
     }
 
@@ -159,14 +159,14 @@ pub async fn update_user(
     // Users can only update their own data, unless they are admin
     if claims.sub != id.to_string() && claims.role != "admin" {
         return Err(crate::errors::AppError::Authorization(
-            "Akses ditolak. Anda hanya dapat mengubah data diri sendiri.".into(),
+            "Access denied. You can only modify your own data.".into(),
         ));
     }
 
     // If not admin, they can't modify the is_active field
     if claims.role != "admin" && update_dto.is_active.is_some() {
         return Err(crate::errors::AppError::Authorization(
-            "Akses ditolak. Hanya admin yang dapat mengubah status aktif pengguna.".into(),
+            "Access denied. Only administrators can change a user's active status.".into(),
         ));
     }
 
@@ -188,7 +188,7 @@ pub async fn delete_user(
     // Only admin can delete users
     if claims.role != "admin" {
         return Err(crate::errors::AppError::Authorization(
-            "Akses ditolak. Hanya admin yang dapat menghapus pengguna.".into(),
+            "Access denied. Only administrators can delete users.".into(),
         ));
     }
 
@@ -211,7 +211,7 @@ pub async fn update_password(
     // Users can only update their own password
     if claims.sub != id.to_string() {
         return Err(crate::errors::AppError::Authorization(
-            "Akses ditolak. Anda hanya dapat mengubah password diri sendiri.".into(),
+            "Access denied. You can only change your own password.".into(),
         ));
     }
 

@@ -25,13 +25,13 @@ impl TokenService {
         Self { config }
     }
 
-    // Generate token dan refresh token untuk user
+    // Generate token and refresh token for user
     pub fn generate_tokens(&self, user: &User) -> Result<(String, String), AppError> {
         let now = Utc::now();
         let token_exp = now + Duration::seconds(self.config.jwt_expiration);
         let refresh_token_exp = now + Duration::seconds(self.config.refresh_token_expiration);
 
-        // Claims untuk token utama
+        // Claims for the main token
         let claims = Claims {
             sub: user.id.to_string(),
             exp: token_exp.timestamp(),
@@ -40,7 +40,7 @@ impl TokenService {
             role: user.global_role.clone(),
         };
 
-        // Claims untuk refresh token (sama, tapi dengan expiry yang berbeda)
+        // Claims for refresh token (same, but with different expiry)
         let refresh_claims = Claims {
             sub: user.id.to_string(),
             exp: refresh_token_exp.timestamp(),
@@ -55,7 +55,7 @@ impl TokenService {
             &claims,
             &EncodingKey::from_secret(self.config.jwt_secret.as_bytes()),
         )
-        .map_err(|e| AppError::Internal(format!("Gagal generate token: {}", e)))?;
+        .map_err(|e| AppError::Internal(format!("Failed to generate token: {}", e)))?;
 
         // Encode refresh token
         let refresh_token = encode(
@@ -63,12 +63,12 @@ impl TokenService {
             &refresh_claims,
             &EncodingKey::from_secret(self.config.jwt_secret.as_bytes()),
         )
-        .map_err(|e| AppError::Internal(format!("Gagal generate refresh token: {}", e)))?;
+        .map_err(|e| AppError::Internal(format!("Failed to generate refresh token: {}", e)))?;
 
         Ok((token, refresh_token))
     }
 
-    // Verifikasi token dan return claims
+    // Verify token and return claims
     pub fn verify_token(&self, token: &str) -> Result<Claims, AppError> {
         let decoded = decode::<Claims>(
             token,
@@ -77,19 +77,19 @@ impl TokenService {
         )
         .map_err(|e| match e.kind() {
             jsonwebtoken::errors::ErrorKind::ExpiredSignature => {
-                AppError::Authentication("Token sudah expired".into())
+                AppError::Authentication("Token has expired".into())
             }
-            _ => AppError::Authentication("Token tidak valid".into()),
+            _ => AppError::Authentication("Invalid token".into()),
         })?;
 
         Ok(decoded.claims)
     }
 
-    // Refresh token untuk mendapatkan token baru
+    // Refresh token to get a new token
     pub fn refresh_token(&self, refresh_token: &str) -> Result<String, AppError> {
         let claims = self.verify_token(refresh_token)?;
 
-        // Buat token baru dengan claims yang sama namun expiry baru
+        // Create a new token with same claims but new expiry
         let now = Utc::now();
         let token_exp = now + Duration::seconds(self.config.jwt_expiration);
 
@@ -106,16 +106,16 @@ impl TokenService {
             &new_claims,
             &EncodingKey::from_secret(self.config.jwt_secret.as_bytes()),
         )
-        .map_err(|e| AppError::Internal(format!("Gagal generate token baru: {}", e)))?;
+        .map_err(|e| AppError::Internal(format!("Failed to generate new token: {}", e)))?;
 
         Ok(new_token)
     }
 
-    // Extract user ID dari token
+    // Extract user ID from token
     pub fn get_user_id_from_token(&self, token: &str) -> Result<Uuid, AppError> {
         let claims = self.verify_token(token)?;
         let user_id = Uuid::parse_str(&claims.sub).map_err(|_| {
-            AppError::Authentication("Token berisi user ID yang tidak valid".into())
+            AppError::Authentication("Token contains invalid user ID".into())
         })?;
 
         Ok(user_id)

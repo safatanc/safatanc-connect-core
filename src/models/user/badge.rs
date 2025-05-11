@@ -1,4 +1,4 @@
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, NaiveDateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 use uuid::Uuid;
@@ -9,9 +9,9 @@ pub struct Badge {
     pub name: String,
     pub description: Option<String>,
     pub image_url: Option<String>,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
-    pub deleted_at: Option<DateTime<Utc>>,
+    pub created_at: NaiveDateTime,
+    pub updated_at: NaiveDateTime,
+    pub deleted_at: Option<NaiveDateTime>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
@@ -19,9 +19,9 @@ pub struct UserBadge {
     pub id: Uuid,
     pub user_id: Uuid,
     pub badge_id: Uuid,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
-    pub deleted_at: Option<DateTime<Utc>>,
+    pub created_at: NaiveDateTime,
+    pub updated_at: NaiveDateTime,
+    pub deleted_at: Option<NaiveDateTime>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -46,7 +46,7 @@ pub struct UpdateBadgeDto {
     pub image_url: Option<String>,
 }
 
-// Implementasi From trait untuk konversi dari Badge ke BadgeResponse
+// Implementation of From trait for converting from Badge to BadgeResponse
 impl From<Badge> for BadgeResponse {
     fn from(badge: Badge) -> Self {
         Self {

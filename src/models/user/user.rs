@@ -53,7 +53,7 @@ pub struct UserResponse {
     pub avatar_url: Option<String>,
     pub global_role: String,
     pub is_email_verified: bool,
-    pub created_at: DateTime<Utc>,
+    pub created_at: NaiveDateTime,
 }
 
 #[derive(Debug, Serialize)]
@@ -63,7 +63,7 @@ pub struct AuthResponse {
     pub refresh_token: String,
 }
 
-// Implementasi From trait untuk konversi dari User ke UserResponse
+// Implementation of From trait for converting from User to UserResponse
 impl From<User> for UserResponse {
     fn from(user: User) -> Self {
         Self {
@@ -74,7 +74,7 @@ impl From<User> for UserResponse {
             avatar_url: user.avatar_url,
             global_role: user.global_role,
             is_email_verified: user.is_email_verified,
-            created_at: DateTime::from_utc(user.created_at, Utc),
+            created_at: user.created_at,
         }
     }
 }

@@ -19,12 +19,12 @@ impl UserManagementService {
         Self { user_repo }
     }
 
-    // Registrasi pengguna baru
+    // Register new user
     pub async fn register_user(&self, dto: CreateUserDto) -> Result<User, AppError> {
-        // Hash password menggunakan Argon2
+        // Hash password using Argon2
         let password_hash = self.hash_password(&dto.password)?;
 
-        // Simpan user ke database
+        // Save user to database
         let user = self
             .user_repo
             .create(&dto, password_hash)
@@ -34,17 +34,17 @@ impl UserManagementService {
         Ok(user)
     }
 
-    // Dapatkan data pengguna berdasarkan ID
+    // Get user data by ID
     pub async fn get_user_by_id(&self, id: Uuid) -> Result<UserResponse, AppError> {
         let user = self.user_repo.find_by_id(id).await.map_err(|e| match e {
-            DatabaseError::NotFound => AppError::NotFound("User tidak ditemukan".into()),
+            DatabaseError::NotFound => AppError::NotFound("User not found".into()),
             _ => AppError::Database(e),
         })?;
 
         Ok(UserResponse::from(user))
     }
 
-    // Dapatkan semua pengguna dengan pagination
+    // Get all users with pagination
     pub async fn get_all_users(
         &self,
         page: u32,
@@ -53,30 +53,30 @@ impl UserManagementService {
         let limit = limit as i64;
         let offset = (page as i64 - 1) * limit;
 
-        // Dapatkan data pengguna
+        // Get user data
         let users = self
             .user_repo
             .find_all(limit, offset)
             .await
             .map_err(AppError::Database)?;
 
-        // Dapatkan total jumlah pengguna untuk pagination
+        // Get total user count for pagination
         let total = self.user_repo.count().await.map_err(AppError::Database)? as u64;
 
-        // Konversi ke UserResponse
+        // Convert to UserResponse
         let user_responses = users.into_iter().map(UserResponse::from).collect();
 
         Ok((user_responses, total))
     }
 
-    // Update profil pengguna
+    // Update user profile
     pub async fn update_user(
         &self,
         id: Uuid,
         dto: UpdateUserDto,
     ) -> Result<UserResponse, AppError> {
         let user = self.user_repo.update(id, &dto).await.map_err(|e| match e {
-            DatabaseError::NotFound => AppError::NotFound("User tidak ditemukan".into()),
+            DatabaseError::NotFound => AppError::NotFound("User not found".into()),
             DatabaseError::Duplicate(msg) => AppError::Validation(msg),
             _ => AppError::Database(e),
         })?;
@@ -84,26 +84,26 @@ impl UserManagementService {
         Ok(UserResponse::from(user))
     }
 
-    // Update password pengguna
+    // Update user password
     pub async fn update_password(
         &self,
         id: Uuid,
         current_password: &str,
         new_password: &str,
     ) -> Result<(), AppError> {
-        // Dapatkan data pengguna
+        // Get user data
         let user = self.user_repo.find_by_id(id).await.map_err(|e| match e {
-            DatabaseError::NotFound => AppError::NotFound("User tidak ditemukan".into()),
+            DatabaseError::NotFound => AppError::NotFound("User not found".into()),
             _ => AppError::Database(e),
         })?;
 
-        // Verifikasi password saat ini
+        // Verify current password
         self.verify_password(current_password, &user.password_hash)?;
 
-        // Hash password baru
+        // Hash new password
         let new_password_hash = self.hash_password(new_password)?;
 
-        // Update password di database
+        // Update password in database
         self.user_repo
             .update_password(id, &new_password_hash)
             .await
@@ -112,31 +112,31 @@ impl UserManagementService {
         Ok(())
     }
 
-    // Hapus pengguna (soft delete)
+    // Delete user (soft delete)
     pub async fn delete_user(&self, id: Uuid) -> Result<(), AppError> {
         self.user_repo.delete(id).await.map_err(|e| match e {
-            DatabaseError::NotFound => AppError::NotFound("User tidak ditemukan".into()),
+            DatabaseError::NotFound => AppError::NotFound("User not found".into()),
             _ => AppError::Database(e),
         })?;
 
         Ok(())
     }
 
-    // Verifikasi email pengguna
+    // Verify user email
     pub async fn verify_email(&self, id: Uuid) -> Result<UserResponse, AppError> {
         let user = self
             .user_repo
             .update_email_verification(id, true)
             .await
             .map_err(|e| match e {
-                DatabaseError::NotFound => AppError::NotFound("User tidak ditemukan".into()),
+                DatabaseError::NotFound => AppError::NotFound("User not found".into()),
                 _ => AppError::Database(e),
             })?;
 
         Ok(UserResponse::from(user))
     }
 
-    // Helper function untuk hash password
+    // Helper function to hash password
     pub fn hash_password(&self, password: &str) -> Result<String, AppError> {
         let salt = SaltString::generate(&mut OsRng);
         let argon2 = Argon2::default();
@@ -144,16 +144,16 @@ impl UserManagementService {
         argon2
             .hash_password(password.as_bytes(), &salt)
             .map(|hash| hash.to_string())
-            .map_err(|e| AppError::Internal(format!("Gagal hash password: {}", e)))
+            .map_err(|e| AppError::Internal(format!("Failed to hash password: {}", e)))
     }
 
-    // Helper function untuk verifikasi password
+    // Helper function to verify password
     pub fn verify_password(&self, password: &str, hash: &str) -> Result<(), AppError> {
         let parsed_hash = PasswordHash::new(hash)
-            .map_err(|e| AppError::Internal(format!("Format hash password invalid: {}", e)))?;
+            .map_err(|e| AppError::Internal(format!("Invalid password hash format: {}", e)))?;
 
         Argon2::default()
             .verify_password(password.as_bytes(), &parsed_hash)
-            .map_err(|_| AppError::Authentication("Email atau password salah".into()))
+            .map_err(|_| AppError::Authentication("Email or password incorrect".into()))
     }
 }
