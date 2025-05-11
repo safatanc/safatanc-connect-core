@@ -2,30 +2,29 @@ use std::sync::Arc;
 use uuid::Uuid;
 
 use crate::db::error::DatabaseError;
+use crate::db::repositories::TokenRepository;
 use crate::db::repositories::UserRepository;
 use crate::errors::AppError;
-use crate::models::user::{AuthResponse, LoginDto, UserResponse, CreateUserDto, User, VerificationToken};
+use crate::models::auth::token::VerificationToken;
+use crate::models::auth::token::{CreateVerificationTokenDto, TOKEN_TYPE_EMAIL_VERIFICATION};
+use crate::models::user::{AuthResponse, CreateUserDto, LoginDto, User, UserResponse};
 use crate::services::auth::token::TokenService;
 use crate::services::user::user_management::UserManagementService;
-use crate::db::executor::run_transaction;
-use sqlx::Transaction;
-use crate::models::auth::token::{CreateVerificationTokenDto, TOKEN_TYPE_EMAIL_VERIFICATION};
-use crate::db::repositories::TokenRepository;
 use sqlx::PgPool;
 
 pub struct AuthService {
-    user_repo: Arc<UserRepository<PgPool>>,
+    user_repo: UserRepository,
     token_service: Arc<TokenService>,
     user_management: Arc<UserManagementService>,
-    pool: Arc<PgPool>,
+    pool: PgPool,
 }
 
 impl AuthService {
     pub fn new(
-        user_repo: Arc<UserRepository<PgPool>>,
+        user_repo: UserRepository,
         token_service: Arc<TokenService>,
         user_management: Arc<UserManagementService>,
-        pool: Arc<PgPool>,
+        pool: PgPool,
     ) -> Self {
         Self {
             user_repo,
@@ -50,7 +49,7 @@ impl AuthService {
             .map_err(|_| AppError::Authentication("Invalid email or password".to_string()))?;
 
         // Generate token pair
-        let token_pair = self.token_service.generate_token_pair(user.id)?;
+        let token_pair = self.token_service.generate_tokens(&user)?;
 
         // Update last login timestamp
         let user = self
@@ -121,37 +120,100 @@ impl AuthService {
     // Example method using a transaction for user registration
     // and verification token creation in a single transaction
     pub async fn register_user_with_verification(
-        &self, 
-        dto: CreateUserDto
+        &self,
+        dto: CreateUserDto,
     ) -> Result<(User, VerificationToken), AppError> {
-        // Use run_transaction to run multiple operations in a single transaction
-        run_transaction(self.pool.as_ref(), |tx| {
-            let dto = dto.clone(); // Clone dto to use in the closure
-            
-            Box::new(async move {
-                // Hash password
-                let password_hash = self.user_management.hash_password(&dto.password)?;
-                
-                // Create repository that uses the transaction
-                let tx_user_repo = UserRepository::new(Arc::new(tx.clone()));
-                
-                // Create user
-                let user = tx_user_repo.create(&dto, password_hash).await?;
-                
-                // Create email verification token
-                let token_dto = CreateVerificationTokenDto {
-                    user_id: Some(user.id),
-                    token_type: TOKEN_TYPE_EMAIL_VERIFICATION.to_string(),
-                    expires_in: 86400, // 24 hours
-                };
-                
-                // Create verification token within the transaction
-                let token_string = self.token_service.generate_token(32)?;
-                let tx_token_repo = TokenRepository::new(Arc::new(tx.clone()));
-                let token = tx_token_repo.create(&token_dto, &token_string).await?;
-                
-                Ok::<(User, VerificationToken), AppError>((user, token))
-            })
-        }).await
+        // Start a transaction
+        let mut tx = self.pool.begin().await.map_err(AppError::from)?;
+
+        // Hash password
+        let password_hash = self.user_management.hash_password(&dto.password)?;
+
+        // Create user directly with the transaction
+        let user = sqlx::query_as!(
+            User,
+            r#"
+            INSERT INTO users (
+                email, username, password_hash, full_name, avatar_url, 
+                global_role, is_email_verified, is_active
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            RETURNING 
+                id, email, username, password_hash, full_name, avatar_url,
+                global_role, is_email_verified, is_active, last_login_at,
+                created_at, updated_at, deleted_at
+            "#,
+            dto.email,
+            dto.username,
+            password_hash,
+            dto.full_name,
+            dto.avatar_url,
+            "user", // Default role
+            false,  // Email not verified by default
+            true,   // User active by default
+        )
+        .fetch_one(&mut *tx)
+        .await
+        .map_err(|e| {
+            if let sqlx::Error::Database(ref db_err) = e {
+                if let Some(constraint) = db_err.constraint() {
+                    match constraint {
+                        "users_email_key" => {
+                            AppError::Validation("Email already exists".to_string())
+                        }
+                        "users_username_key" => {
+                            AppError::Validation("Username already exists".to_string())
+                        }
+                        _ => AppError::Database(DatabaseError::ConnectionError(e)),
+                    }
+                } else {
+                    AppError::Database(DatabaseError::ConnectionError(e))
+                }
+            } else {
+                AppError::Database(DatabaseError::ConnectionError(e))
+            }
+        })?;
+
+        // Generate a verification token
+        let token_string = self.generate_random_token(32)?;
+
+        // Create verification token within the transaction
+        let token = sqlx::query_as!(
+            VerificationToken,
+            r#"
+            INSERT INTO verification_tokens (
+                user_id, token, token_type, expires_at
+            )
+            VALUES ($1, $2, $3, NOW() + $4 * INTERVAL '1 second')
+            RETURNING 
+                id, user_id, token, token_type, expires_at, used_at,
+                created_at, updated_at
+            "#,
+            user.id,
+            token_string,
+            TOKEN_TYPE_EMAIL_VERIFICATION,
+            86400i32, // 24 hours
+        )
+        .fetch_one(&mut *tx)
+        .await
+        .map_err(|e| AppError::Database(DatabaseError::ConnectionError(e)))?;
+
+        // Commit the transaction
+        tx.commit().await.map_err(AppError::from)?;
+
+        Ok((user, token))
+    }
+
+    // Simple random token generator
+    fn generate_random_token(&self, length: usize) -> Result<String, AppError> {
+        use rand::{distributions::Alphanumeric, Rng};
+
+        let token: String = rand::thread_rng()
+            .sample_iter(&Alphanumeric)
+            .take(length)
+            .map(char::from)
+            .collect();
+
+        Ok(token)
     }
 }

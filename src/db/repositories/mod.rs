@@ -5,7 +5,6 @@ pub mod user;
 
 use std::sync::Arc;
 use sqlx::PgPool;
-use crate::db::executor::DbExecutor;
 
 pub use oauth::*;
 pub use session::*;
@@ -14,7 +13,7 @@ pub use user::*;
 
 #[derive(Clone)]
 pub struct Repositories {
-    user: Arc<UserRepository<PgPool>>,
+    user: UserRepository,
     session: SessionRepository,
     oauth: OAuthRepository,
     token: TokenRepository,
@@ -22,17 +21,15 @@ pub struct Repositories {
 
 impl Repositories {
     pub fn new(pool: PgPool) -> Self {
-        let pool_arc = Arc::new(pool);
-        
         Self {
-            user: Arc::new(UserRepository::new(pool_arc.clone())),
-            session: SessionRepository::new(pool_arc.clone()),
-            oauth: OAuthRepository::new(pool_arc.clone()),
-            token: TokenRepository::new(pool_arc),
+            user: UserRepository::new(pool.clone()),
+            session: SessionRepository::new(pool.clone()),
+            oauth: OAuthRepository::new(pool.clone()),
+            token: TokenRepository::new(pool),
         }
     }
 
-    pub fn user(&self) -> &Arc<UserRepository<PgPool>> {
+    pub fn user(&self) -> &UserRepository {
         &self.user
     }
 

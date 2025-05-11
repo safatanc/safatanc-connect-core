@@ -1,20 +1,18 @@
 use chrono::{DateTime, NaiveDateTime, Utc};
 use sqlx::{postgres::PgQueryResult, PgPool};
-use std::sync::Arc;
 use uuid::Uuid;
 
 use crate::db::error::{DatabaseError, DatabaseResult};
-use crate::db::executor::DbExecutor;
 use crate::models::user::{CreateUserDto, UpdateUserDto, User};
 
 #[derive(Clone)]
-pub struct UserRepository<E: DbExecutor> {
-    executor: Arc<E>,
+pub struct UserRepository {
+    pool: PgPool,
 }
 
-impl<E: DbExecutor> UserRepository<E> {
-    pub fn new(executor: Arc<E>) -> Self {
-        Self { executor }
+impl UserRepository {
+    pub fn new(pool: PgPool) -> Self {
+        Self { pool }
     }
 
     // Create a new user
@@ -41,7 +39,7 @@ impl<E: DbExecutor> UserRepository<E> {
             false,  // Email not verified by default
             true,   // User active by default
         )
-        .fetch_one(self.executor.as_ref())
+        .fetch_one(&self.pool)
         .await
         .map_err(|e| {
             if let sqlx::Error::Database(ref db_err) = e {
@@ -80,7 +78,7 @@ impl<E: DbExecutor> UserRepository<E> {
             "#,
             id
         )
-        .fetch_optional(self.executor.as_ref())
+        .fetch_optional(&self.pool)
         .await
         .map_err(DatabaseError::ConnectionError)?;
 
@@ -101,7 +99,7 @@ impl<E: DbExecutor> UserRepository<E> {
             "#,
             email
         )
-        .fetch_optional(self.executor.as_ref())
+        .fetch_optional(&self.pool)
         .await
         .map_err(DatabaseError::ConnectionError)?;
 
@@ -122,7 +120,7 @@ impl<E: DbExecutor> UserRepository<E> {
             "#,
             username
         )
-        .fetch_optional(self.executor.as_ref())
+        .fetch_optional(&self.pool)
         .await
         .map_err(DatabaseError::ConnectionError)?;
 
@@ -146,7 +144,7 @@ impl<E: DbExecutor> UserRepository<E> {
             limit,
             offset
         )
-        .fetch_all(self.executor.as_ref())
+        .fetch_all(&self.pool)
         .await
         .map_err(DatabaseError::ConnectionError)?;
 
@@ -162,7 +160,7 @@ impl<E: DbExecutor> UserRepository<E> {
             WHERE deleted_at IS NULL
             "#
         )
-        .fetch_one(self.executor.as_ref())
+        .fetch_one(&self.pool)
         .await
         .map_err(DatabaseError::ConnectionError)?;
 
@@ -193,7 +191,7 @@ impl<E: DbExecutor> UserRepository<E> {
             dto.is_active,
             id
         )
-        .fetch_optional(self.executor.as_ref())
+        .fetch_optional(&self.pool)
         .await
         .map_err(|e| {
             if let sqlx::Error::Database(ref db_err) = e {
@@ -232,7 +230,7 @@ impl<E: DbExecutor> UserRepository<E> {
             password_hash,
             id
         )
-        .fetch_optional(self.executor.as_ref())
+        .fetch_optional(&self.pool)
         .await
         .map_err(DatabaseError::ConnectionError)?;
 
@@ -261,60 +259,53 @@ impl<E: DbExecutor> UserRepository<E> {
             is_verified,
             id
         )
-        .fetch_optional(self.executor.as_ref())
+        .fetch_optional(&self.pool)
         .await
         .map_err(DatabaseError::ConnectionError)?;
 
         user.ok_or(DatabaseError::NotFound)
     }
 
-    // Update last login time
+    // Update last login timestamp
     pub async fn update_last_login(&self, id: Uuid) -> DatabaseResult<User> {
-        let now = Utc::now().naive_utc();
-
         let user = sqlx::query_as!(
             User,
             r#"
             UPDATE users
             SET
-                last_login_at = $1,
+                last_login_at = now(),
                 updated_at = now()
-            WHERE id = $2 AND deleted_at IS NULL
+            WHERE id = $1 AND deleted_at IS NULL
             RETURNING 
                 id, email, username, password_hash, full_name, avatar_url,
                 global_role, is_email_verified, is_active, last_login_at,
                 created_at, updated_at, deleted_at
             "#,
-            now,
             id
         )
-        .fetch_optional(self.executor.as_ref())
+        .fetch_optional(&self.pool)
         .await
         .map_err(DatabaseError::ConnectionError)?;
 
         user.ok_or(DatabaseError::NotFound)
     }
 
-    // Soft delete a user
+    // Delete user (soft delete)
     pub async fn delete(&self, id: Uuid) -> DatabaseResult<PgQueryResult> {
-        let now = Utc::now().naive_utc();
-
         let result = sqlx::query!(
             r#"
             UPDATE users
             SET
-                deleted_at = $1,
+                deleted_at = now(),
                 updated_at = now()
-            WHERE id = $2 AND deleted_at IS NULL
+            WHERE id = $1 AND deleted_at IS NULL
             "#,
-            now,
             id
         )
-        .execute(self.executor.as_ref())
+        .execute(&self.pool)
         .await
         .map_err(DatabaseError::ConnectionError)?;
 
-        // Check if any rows were affected
         if result.rows_affected() == 0 {
             return Err(DatabaseError::NotFound);
         }

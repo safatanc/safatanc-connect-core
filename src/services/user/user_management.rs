@@ -11,11 +11,11 @@ use crate::errors::AppError;
 use crate::models::user::{CreateUserDto, UpdateUserDto, User, UserResponse};
 
 pub struct UserManagementService {
-    user_repo: Arc<UserRepository>,
+    user_repo: UserRepository,
 }
 
 impl UserManagementService {
-    pub fn new(user_repo: Arc<UserRepository>) -> Self {
+    pub fn new(user_repo: UserRepository) -> Self {
         Self { user_repo }
     }
 
