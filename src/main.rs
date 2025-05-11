@@ -14,6 +14,8 @@ use tracing::{info, Level};
 use tracing_subscriber::FmtSubscriber;
 
 use db::repositories::Repositories;
+use db::repositories::TokenRepository;
+use db::repositories::UserRepository;
 use services::auth::{AuthService, TokenService};
 use services::user::UserManagementService;
 
@@ -43,10 +45,13 @@ async fn main() -> anyhow::Result<()> {
 
     // Initialize services
     let token_service = Arc::new(TokenService::new(config.clone()));
-    let user_repo = Arc::new(repos.user().clone());
+    let user_repo = UserRepository::new(db_pool.as_ref().clone());
+    let token_repo = TokenRepository::new(db_pool.as_ref().clone());
+
     let user_management_service = Arc::new(UserManagementService::new(user_repo.clone()));
     let auth_service = Arc::new(AuthService::new(
-        user_repo.clone(),
+        user_repo,
+        token_repo,
         token_service.clone(),
         user_management_service.clone(),
     ));

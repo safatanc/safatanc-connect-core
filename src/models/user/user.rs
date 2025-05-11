@@ -44,6 +44,17 @@ pub struct LoginDto {
     pub password: String,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct PasswordResetRequestDto {
+    pub email: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct PasswordResetDto {
+    pub token: String,
+    pub new_password: String,
+}
+
 #[derive(Debug, Serialize)]
 pub struct UserResponse {
     pub id: Uuid,

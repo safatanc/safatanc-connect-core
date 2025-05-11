@@ -1,36 +1,44 @@
 use std::sync::Arc;
 use uuid::Uuid;
 
+use oauth2::{
+    basic::BasicClient, AuthUrl, ClientId, ClientSecret, CsrfToken, RedirectUrl, Scope,
+    TokenResponse, TokenUrl,
+};
+use reqwest::Client as HttpClient;
+use serde_json::Value;
+
 use crate::db::error::DatabaseError;
 use crate::db::repositories::TokenRepository;
 use crate::db::repositories::UserRepository;
 use crate::errors::AppError;
 use crate::models::auth::token::VerificationToken;
-use crate::models::auth::token::{CreateVerificationTokenDto, TOKEN_TYPE_EMAIL_VERIFICATION};
+use crate::models::auth::token::{
+    CreateVerificationTokenDto, TOKEN_TYPE_EMAIL_VERIFICATION, TOKEN_TYPE_PASSWORD_RESET,
+};
 use crate::models::user::{AuthResponse, CreateUserDto, LoginDto, User, UserResponse};
 use crate::services::auth::token::TokenService;
 use crate::services::user::user_management::UserManagementService;
-use sqlx::PgPool;
 
 pub struct AuthService {
     user_repo: UserRepository,
+    token_repo: TokenRepository,
     token_service: Arc<TokenService>,
     user_management: Arc<UserManagementService>,
-    pool: PgPool,
 }
 
 impl AuthService {
     pub fn new(
         user_repo: UserRepository,
+        token_repo: TokenRepository,
         token_service: Arc<TokenService>,
         user_management: Arc<UserManagementService>,
-        pool: PgPool,
     ) -> Self {
         Self {
             user_repo,
+            token_repo,
             token_service,
             user_management,
-            pool,
         }
     }
 
@@ -117,89 +125,40 @@ impl AuthService {
         self.token_service.get_user_id_from_token(token)
     }
 
-    // Example method using a transaction for user registration
-    // and verification token creation in a single transaction
+    // Method for user registration with verification token creation
     pub async fn register_user_with_verification(
         &self,
         dto: CreateUserDto,
     ) -> Result<(User, VerificationToken), AppError> {
-        // Start a transaction
-        let mut tx = self.pool.begin().await.map_err(AppError::from)?;
-
         // Hash password
         let password_hash = self.user_management.hash_password(&dto.password)?;
 
-        // Create user directly with the transaction
-        let user = sqlx::query_as!(
-            User,
-            r#"
-            INSERT INTO users (
-                email, username, password_hash, full_name, avatar_url, 
-                global_role, is_email_verified, is_active
-            )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-            RETURNING 
-                id, email, username, password_hash, full_name, avatar_url,
-                global_role, is_email_verified, is_active, last_login_at,
-                created_at, updated_at, deleted_at
-            "#,
-            dto.email,
-            dto.username,
-            password_hash,
-            dto.full_name,
-            dto.avatar_url,
-            "user", // Default role
-            false,  // Email not verified by default
-            true,   // User active by default
-        )
-        .fetch_one(&mut *tx)
-        .await
-        .map_err(|e| {
-            if let sqlx::Error::Database(ref db_err) = e {
-                if let Some(constraint) = db_err.constraint() {
-                    match constraint {
-                        "users_email_key" => {
-                            AppError::Validation("Email already exists".to_string())
-                        }
-                        "users_username_key" => {
-                            AppError::Validation("Username already exists".to_string())
-                        }
-                        _ => AppError::Database(DatabaseError::ConnectionError(e)),
-                    }
-                } else {
-                    AppError::Database(DatabaseError::ConnectionError(e))
-                }
-            } else {
-                AppError::Database(DatabaseError::ConnectionError(e))
-            }
-        })?;
+        // Create user
+        let user = self
+            .user_repo
+            .create(&dto, password_hash)
+            .await
+            .map_err(|e| match e {
+                DatabaseError::Duplicate(msg) => AppError::Validation(msg),
+                _ => AppError::Database(e),
+            })?;
 
         // Generate a verification token
         let token_string = self.generate_random_token(32)?;
 
-        // Create verification token within the transaction
-        let token = sqlx::query_as!(
-            VerificationToken,
-            r#"
-            INSERT INTO verification_tokens (
-                user_id, token, token_type, expires_at
-            )
-            VALUES ($1, $2, $3, NOW() + $4 * INTERVAL '1 second')
-            RETURNING 
-                id, user_id, token, token_type, expires_at, used_at,
-                created_at, updated_at
-            "#,
-            user.id,
-            token_string,
-            TOKEN_TYPE_EMAIL_VERIFICATION,
-            86400i32, // 24 hours
-        )
-        .fetch_one(&mut *tx)
-        .await
-        .map_err(|e| AppError::Database(DatabaseError::ConnectionError(e)))?;
+        // Create the verification token
+        let token_dto = CreateVerificationTokenDto {
+            user_id: Some(user.id),
+            token_type: TOKEN_TYPE_EMAIL_VERIFICATION.to_string(),
+            expires_in: 86400, // 24 hours in seconds
+        };
 
-        // Commit the transaction
-        tx.commit().await.map_err(AppError::from)?;
+        // Use token repository to create the token
+        let token = self
+            .token_repo
+            .create(&token_dto, &token_string)
+            .await
+            .map_err(AppError::Database)?;
 
         Ok((user, token))
     }
@@ -215,5 +174,371 @@ impl AuthService {
             .collect();
 
         Ok(token)
+    }
+
+    // Verify email token and mark user's email as verified
+    pub async fn verify_email_token(&self, token: &str) -> Result<UserResponse, AppError> {
+        // Verify the token from the database
+        let verification_token = self
+            .token_repo
+            .verify_token(token, TOKEN_TYPE_EMAIL_VERIFICATION)
+            .await
+            .map_err(|_| AppError::InvalidToken("Invalid or expired verification token".into()))?;
+
+        // Ensure the token is linked to a user
+        let user_id = verification_token
+            .user_id
+            .ok_or_else(|| AppError::InvalidToken("Token is not associated with a user".into()))?;
+
+        // Mark the token as used
+        self.token_repo
+            .mark_as_used(verification_token.id)
+            .await
+            .map_err(AppError::Database)?;
+
+        // Mark user's email as verified
+        let user_response = self.user_management.verify_email(user_id).await?;
+
+        Ok(user_response)
+    }
+
+    // Request password reset and generate token
+    pub async fn request_password_reset(&self, email: &str) -> Result<VerificationToken, AppError> {
+        // Find user by email
+        let user = self
+            .user_repo
+            .find_by_email(email)
+            .await
+            .map_err(|e| match e {
+                DatabaseError::NotFound => AppError::NotFound("User not found".into()),
+                _ => AppError::Database(e),
+            })?;
+
+        // Invalidate any existing password reset tokens for this user
+        let _ = self
+            .token_repo
+            .invalidate_by_user_and_type(user.id, TOKEN_TYPE_PASSWORD_RESET)
+            .await;
+
+        // Generate a new token
+        let token_string = self.generate_random_token(32)?;
+
+        // Create the password reset token
+        let token_dto = CreateVerificationTokenDto {
+            user_id: Some(user.id),
+            token_type: TOKEN_TYPE_PASSWORD_RESET.to_string(),
+            expires_in: 3600, // 1 hour in seconds
+        };
+
+        // Use token repository to create the token
+        let token = self
+            .token_repo
+            .create(&token_dto, &token_string)
+            .await
+            .map_err(AppError::Database)?;
+
+        // Here you would typically send an email with the reset link
+        // For now, we're just returning the token for testing purposes
+        // In production, don't return the token directly to the API
+
+        Ok(token)
+    }
+
+    // Reset password using token
+    pub async fn reset_password(&self, token: &str, new_password: &str) -> Result<(), AppError> {
+        // Verify the token from the database
+        let verification_token = self
+            .token_repo
+            .verify_token(token, TOKEN_TYPE_PASSWORD_RESET)
+            .await
+            .map_err(|_| AppError::InvalidToken("Invalid or expired reset token".into()))?;
+
+        // Ensure the token is linked to a user
+        let user_id = verification_token
+            .user_id
+            .ok_or_else(|| AppError::InvalidToken("Token is not associated with a user".into()))?;
+
+        // Mark the token as used
+        self.token_repo
+            .mark_as_used(verification_token.id)
+            .await
+            .map_err(AppError::Database)?;
+
+        // Hash new password
+        let password_hash = self.user_management.hash_password(new_password)?;
+
+        // Update user's password
+        self.user_repo
+            .update_password(user_id, &password_hash)
+            .await
+            .map_err(AppError::Database)?;
+
+        // Invalidate all other password reset tokens for this user
+        let _ = self
+            .token_repo
+            .invalidate_by_user_and_type(user_id, TOKEN_TYPE_PASSWORD_RESET)
+            .await;
+
+        Ok(())
+    }
+
+    // OAuth Integrations
+
+    // Get OAuth redirect URL
+    pub async fn get_oauth_redirect_url(&self, provider: &str) -> Result<String, AppError> {
+        // Create an OAuth client for the provider
+        let client = self.create_oauth_client(provider)?;
+
+        // Generate the authorization URL
+        let (auth_url, _csrf_token) = client
+            .authorize_url(CsrfToken::new_random)
+            .add_scope(Scope::new("email".to_string()))
+            .add_scope(Scope::new("profile".to_string()))
+            .url();
+
+        // In a real application, you'd store the CSRF token in a session or cookie
+        // For simplicity, we're not handling CSRF protection here
+
+        Ok(auth_url.to_string())
+    }
+
+    // Handle OAuth callback
+    pub async fn handle_oauth_callback(
+        &self,
+        provider: &str,
+        code: &str,
+    ) -> Result<AuthResponse, AppError> {
+        // Create an OAuth client for the provider
+        let client = self.create_oauth_client(provider)?;
+
+        // Exchange the authorization code for an access token
+        let token_result = client
+            .exchange_code(oauth2::AuthorizationCode::new(code.to_string()))
+            .request_async(oauth2::reqwest::async_http_client)
+            .await
+            .map_err(|e| AppError::Authentication(format!("Failed to exchange code: {}", e)))?;
+
+        // Get the access token
+        let access_token = token_result.access_token().secret();
+
+        // Fetch user info from the provider using the access token
+        let user_info = self.get_oauth_user_info(provider, access_token).await?;
+
+        // Extract user details from the provider response
+        let (email, name, avatar) = self.extract_user_info_from_response(provider, &user_info)?;
+
+        // Check if user exists with this email
+        let user = match self.user_repo.find_by_email(&email).await {
+            Ok(user) => {
+                // User exists, update their last login
+                self.user_repo
+                    .update_last_login(user.id)
+                    .await
+                    .map_err(AppError::from)?
+            }
+            Err(DatabaseError::NotFound) => {
+                // Create a new user
+                let mut create_user_dto = CreateUserDto {
+                    email: email.clone(),
+                    username: Some(email.split('@').next().unwrap_or("user").to_string()),
+                    password: self.generate_random_token(32)?, // Random password
+                    full_name: Some(name),
+                    avatar_url: avatar,
+                };
+
+                // Ensure username is unique by adding random characters if needed
+                let username_base = create_user_dto.username.clone();
+                let mut attempt = 0;
+
+                while self
+                    .user_repo
+                    .find_by_username(&create_user_dto.username.as_ref().unwrap())
+                    .await
+                    .is_ok()
+                {
+                    attempt += 1;
+                    create_user_dto.username =
+                        Some(format!("{}_{}", username_base.clone().unwrap(), attempt));
+                }
+
+                // Hash the random password
+                let password_hash = self
+                    .user_management
+                    .hash_password(&create_user_dto.password)?;
+
+                // Create the user with email verified since it came from OAuth
+                let mut user = self
+                    .user_repo
+                    .create(&create_user_dto, password_hash)
+                    .await
+                    .map_err(|e| match e {
+                        DatabaseError::Duplicate(msg) => AppError::Validation(msg),
+                        _ => AppError::Database(e),
+                    })?;
+
+                // Mark email as verified since it's from the OAuth provider
+                user = self
+                    .user_repo
+                    .update_email_verification(user.id, true)
+                    .await
+                    .map_err(AppError::Database)?;
+
+                user
+            }
+            Err(e) => return Err(AppError::Database(e)),
+        };
+
+        // Generate JWT tokens
+        let token_pair = self.token_service.generate_tokens(&user)?;
+
+        // Create auth response
+        let auth_response = AuthResponse {
+            user: UserResponse::from(user),
+            token: token_pair.0,
+            refresh_token: token_pair.1,
+        };
+
+        Ok(auth_response)
+    }
+
+    // Helper to create OAuth client for a provider
+    fn create_oauth_client(&self, provider: &str) -> Result<BasicClient, AppError> {
+        // In a real application, you'd fetch this configuration from a database
+        // For simplicity, we're hardcoding supported providers here
+
+        match provider.to_lowercase().as_str() {
+            "google" => {
+                let client_id = "your-google-client-id.apps.googleusercontent.com";
+                let client_secret = "your-google-client-secret";
+                let auth_url = "https://accounts.google.com/o/oauth2/v2/auth";
+                let token_url = "https://oauth2.googleapis.com/token";
+                let redirect_url = "http://localhost:3000/api/auth/oauth/google/callback";
+
+                Ok(BasicClient::new(
+                    ClientId::new(client_id.to_string()),
+                    Some(ClientSecret::new(client_secret.to_string())),
+                    AuthUrl::new(auth_url.to_string()).unwrap(),
+                    Some(TokenUrl::new(token_url.to_string()).unwrap()),
+                )
+                .set_redirect_uri(RedirectUrl::new(redirect_url.to_string()).unwrap()))
+            }
+            "github" => {
+                let client_id = "your-github-client-id";
+                let client_secret = "your-github-client-secret";
+                let auth_url = "https://github.com/login/oauth/authorize";
+                let token_url = "https://github.com/login/oauth/access_token";
+                let redirect_url = "http://localhost:3000/api/auth/oauth/github/callback";
+
+                Ok(BasicClient::new(
+                    ClientId::new(client_id.to_string()),
+                    Some(ClientSecret::new(client_secret.to_string())),
+                    AuthUrl::new(auth_url.to_string()).unwrap(),
+                    Some(TokenUrl::new(token_url.to_string()).unwrap()),
+                )
+                .set_redirect_uri(RedirectUrl::new(redirect_url.to_string()).unwrap()))
+            }
+            _ => Err(AppError::Validation(format!(
+                "Unsupported OAuth provider: {}",
+                provider
+            ))),
+        }
+    }
+
+    // Fetch user info from the OAuth provider
+    async fn get_oauth_user_info(
+        &self,
+        provider: &str,
+        access_token: &str,
+    ) -> Result<Value, AppError> {
+        let client = HttpClient::new();
+        let url = match provider.to_lowercase().as_str() {
+            "google" => "https://www.googleapis.com/oauth2/v2/userinfo",
+            "github" => "https://api.github.com/user",
+            _ => {
+                return Err(AppError::Validation(format!(
+                    "Unsupported OAuth provider: {}",
+                    provider
+                )))
+            }
+        };
+
+        let mut req = client
+            .get(url)
+            .header("Authorization", format!("Bearer {}", access_token));
+
+        // Add special headers for GitHub
+        if provider.to_lowercase() == "github" {
+            req = req
+                .header("Accept", "application/json")
+                .header("User-Agent", "SafaTanc-Connect");
+        }
+
+        // Make the request
+        let response = req
+            .send()
+            .await
+            .map_err(|e| AppError::Unexpected(format!("Failed to fetch user info: {}", e)))?;
+
+        // Parse the response
+        let user_info: Value = response
+            .json()
+            .await
+            .map_err(|e| AppError::Unexpected(format!("Failed to parse user info: {}", e)))?;
+
+        Ok(user_info)
+    }
+
+    // Extract user info from OAuth provider response
+    fn extract_user_info_from_response(
+        &self,
+        provider: &str,
+        response: &Value,
+    ) -> Result<(String, String, Option<String>), AppError> {
+        match provider.to_lowercase().as_str() {
+            "google" => {
+                let email = response["email"]
+                    .as_str()
+                    .ok_or_else(|| {
+                        AppError::Authentication("Email not provided by OAuth provider".into())
+                    })?
+                    .to_string();
+
+                let name = response["name"]
+                    .as_str()
+                    .unwrap_or("Google User")
+                    .to_string();
+
+                let avatar = response["picture"].as_str().map(|s| s.to_string());
+
+                Ok((email, name, avatar))
+            }
+            "github" => {
+                let email = match response["email"].as_str() {
+                    Some(email) => email.to_string(),
+                    None => {
+                        // GitHub might not provide email in the initial response
+                        // In a real app, you'd make a separate request to fetch emails
+                        // For simplicity, we'll generate a placeholder email
+                        let username = response["login"].as_str().ok_or_else(|| {
+                            AppError::Authentication("Username not provided by GitHub".into())
+                        })?;
+                        format!("{}@github.user", username)
+                    }
+                };
+
+                let name = response["name"]
+                    .as_str()
+                    .unwrap_or_else(|| response["login"].as_str().unwrap_or("GitHub User"))
+                    .to_string();
+
+                let avatar = response["avatar_url"].as_str().map(|s| s.to_string());
+
+                Ok((email, name, avatar))
+            }
+            _ => Err(AppError::Validation(format!(
+                "Unsupported OAuth provider: {}",
+                provider
+            ))),
+        }
     }
 }

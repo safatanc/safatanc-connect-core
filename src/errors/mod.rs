@@ -27,6 +27,12 @@ pub enum AppError {
 
     #[error("Internal server error: {0}")]
     Internal(String),
+
+    #[error("Invalid token: {0}")]
+    InvalidToken(String),
+
+    #[error("Unexpected error: {0}")]
+    Unexpected(String),
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -54,6 +60,8 @@ impl IntoResponse for AppError {
                 ),
             },
             AppError::Internal(msg) => (StatusCode::INTERNAL_SERVER_ERROR, msg),
+            AppError::InvalidToken(msg) => (StatusCode::UNAUTHORIZED, msg),
+            AppError::Unexpected(msg) => (StatusCode::INTERNAL_SERVER_ERROR, msg),
         };
 
         let body = Json(ErrorResponse {
