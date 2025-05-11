@@ -8,8 +8,11 @@ mod services;
 mod utils;
 
 use std::net::SocketAddr;
+use std::sync::Arc;
 use tracing::{info, Level};
 use tracing_subscriber::FmtSubscriber;
+
+use db::repositories::Repositories;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -24,12 +27,16 @@ async fn main() -> anyhow::Result<()> {
     info!("Configuration loaded");
 
     // Initialize database connection pool
-    let db_pool = db::init_db_pool(&config.database).await?;
+    let db_pool = db::pool::init_db_pool(&config.database).await?;
     info!("Database connection pool initialized");
 
     // Run database health check
-    db::check_connection(&db_pool).await?;
+    db::pool::check_connection(&db_pool).await?;
     info!("Database connection verified");
+
+    // Initialize repositories
+    let repos = Arc::new(Repositories::new(db_pool.as_ref().clone()));
+    info!("Repositories initialized");
 
     let addr = SocketAddr::from(([0, 0, 0, 0], config.server_port));
     info!("Starting server on {}", addr);

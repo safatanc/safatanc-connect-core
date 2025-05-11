@@ -1,9 +1,9 @@
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, NaiveDateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 use uuid::Uuid;
 
-#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct User {
     pub id: Uuid,
     pub email: String,
@@ -15,10 +15,10 @@ pub struct User {
     pub global_role: String,
     pub is_email_verified: bool,
     pub is_active: bool,
-    pub last_login_at: Option<DateTime<Utc>>,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
-    pub deleted_at: Option<DateTime<Utc>>,
+    pub last_login_at: Option<NaiveDateTime>,
+    pub created_at: NaiveDateTime,
+    pub updated_at: NaiveDateTime,
+    pub deleted_at: Option<NaiveDateTime>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -74,7 +74,7 @@ impl From<User> for UserResponse {
             avatar_url: user.avatar_url,
             global_role: user.global_role,
             is_email_verified: user.is_email_verified,
-            created_at: user.created_at,
+            created_at: DateTime::from_utc(user.created_at, Utc),
         }
     }
 }
