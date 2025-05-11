@@ -5,13 +5,13 @@ use crate::services::auth::token::TokenService;
 use crate::services::user::user_management::UserManagementService;
 
 pub struct RegistrationService<'a> {
-    user_management: &'a UserManagementService<'a>,
+    user_management: &'a UserManagementService,
     token_service: &'a TokenService,
 }
 
 impl<'a> RegistrationService<'a> {
     pub fn new(
-        user_management: &'a UserManagementService<'a>,
+        user_management: &'a UserManagementService,
         token_service: &'a TokenService,
     ) -> Self {
         Self {

@@ -7,12 +7,15 @@ mod models;
 mod services;
 mod utils;
 
+use hyper::server::Server;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tracing::{info, Level};
 use tracing_subscriber::FmtSubscriber;
 
 use db::repositories::Repositories;
+use services::auth::{AuthService, TokenService};
+use services::user::UserManagementService;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -38,12 +41,32 @@ async fn main() -> anyhow::Result<()> {
     let repos = Arc::new(Repositories::new(db_pool.as_ref().clone()));
     info!("Repositories initialized");
 
-    let addr = SocketAddr::from(([0, 0, 0, 0], config.server_port));
-    info!("Starting server on {}", addr);
+    // Initialize services
+    let token_service = Arc::new(TokenService::new(config.clone()));
+    let user_repo = Arc::new(repos.user().clone());
+    let user_management_service = Arc::new(UserManagementService::new(user_repo.clone()));
+    let auth_service = Arc::new(AuthService::new(
+        user_repo.clone(),
+        token_service.clone(),
+        user_management_service.clone(),
+    ));
 
-    // TODO: Initialize and start the server with axum
-    println!("Safatanc Connect API - Auth, SSO, and User Management");
-    println!("Server will be implemented in the next step");
+    // Initialize API router
+    let app = api::configure_api(
+        repos.clone(),
+        config.clone(),
+        token_service.clone(),
+        user_management_service.clone(),
+        auth_service.clone(),
+    );
+    info!("API routes configured");
+
+    // Start server
+    let addr = SocketAddr::from(([0, 0, 0, 0], config.server_port));
+    info!("Starting server on http://localhost:{}", config.server_port);
+
+    let listener = tokio::net::TcpListener::bind(addr).await?;
+    axum::serve(listener, app).await?;
 
     Ok(())
 }

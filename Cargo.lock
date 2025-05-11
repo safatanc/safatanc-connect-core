@@ -1911,6 +1911,7 @@ dependencies = [
  "chrono",
  "config",
  "dotenv",
+ "hyper 0.14.32",
  "jsonwebtoken",
  "oauth2",
  "rand",

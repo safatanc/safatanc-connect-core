@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use uuid::Uuid;
 
 use crate::db::error::DatabaseError;
@@ -7,17 +8,17 @@ use crate::models::user::{AuthResponse, LoginDto, UserResponse};
 use crate::services::auth::token::TokenService;
 use crate::services::user::user_management::UserManagementService;
 
-pub struct AuthService<'a> {
-    user_repo: &'a UserRepository,
-    token_service: &'a TokenService,
-    user_management: &'a UserManagementService<'a>,
+pub struct AuthService {
+    user_repo: Arc<UserRepository>,
+    token_service: Arc<TokenService>,
+    user_management: Arc<UserManagementService>,
 }
 
-impl<'a> AuthService<'a> {
+impl AuthService {
     pub fn new(
-        user_repo: &'a UserRepository,
-        token_service: &'a TokenService,
-        user_management: &'a UserManagementService<'a>,
+        user_repo: Arc<UserRepository>,
+        token_service: Arc<TokenService>,
+        user_management: Arc<UserManagementService>,
     ) -> Self {
         Self {
             user_repo,

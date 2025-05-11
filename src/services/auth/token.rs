@@ -7,7 +7,7 @@ use crate::config::AppConfig;
 use crate::errors::AppError;
 use crate::models::user::User;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Claims {
     pub sub: String,   // Subject (user ID)
     pub exp: i64,      // Expiration time

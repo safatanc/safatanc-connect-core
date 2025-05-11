@@ -2,6 +2,7 @@ use argon2::{
     password_hash::{rand_core::OsRng, PasswordHash, PasswordHasher, PasswordVerifier, SaltString},
     Argon2,
 };
+use std::sync::Arc;
 use uuid::Uuid;
 
 use crate::db::error::{DatabaseError, DatabaseResult};
@@ -9,12 +10,12 @@ use crate::db::repositories::UserRepository;
 use crate::errors::AppError;
 use crate::models::user::{CreateUserDto, UpdateUserDto, User, UserResponse};
 
-pub struct UserManagementService<'a> {
-    user_repo: &'a UserRepository,
+pub struct UserManagementService {
+    user_repo: Arc<UserRepository>,
 }
 
-impl<'a> UserManagementService<'a> {
-    pub fn new(user_repo: &'a UserRepository) -> Self {
+impl UserManagementService {
+    pub fn new(user_repo: Arc<UserRepository>) -> Self {
         Self { user_repo }
     }
 
