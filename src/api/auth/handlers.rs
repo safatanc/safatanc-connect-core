@@ -21,8 +21,8 @@ use crate::services::validation::validation_err_to_app_error;
 
 // Login handler
 pub async fn login(
-    Json(credentials): Json<LoginDto>,
     State(state): State<Arc<AuthApiState>>,
+    Json(credentials): Json<LoginDto>,
 ) -> Result<Response, AppError> {
     // Validate credentials
     credentials

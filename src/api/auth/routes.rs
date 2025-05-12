@@ -1,11 +1,13 @@
 use std::sync::Arc;
 
 use axum::{
+    middleware,
     routing::{get, post},
     Router,
 };
 
 use crate::db::repositories::Repositories;
+use crate::middleware::auth::require_auth;
 use crate::services::auth::{AuthService, TokenService};
 use crate::services::user::UserManagementService;
 
@@ -26,26 +28,36 @@ pub fn configure(
     user_management_service: Arc<UserManagementService>,
     auth_service: Arc<AuthService>,
 ) -> Router {
-    let state = AuthApiState {
-        repos,
-        token_service,
+    let state = Arc::new(AuthApiState {
+        repos: repos.clone(),
+        token_service: token_service.clone(),
         user_management_service,
         auth_service,
-    };
+    });
 
-    Router::new()
+    // Public routes - no auth required
+    let public_routes = Router::new()
         .route("/login", post(handlers::login))
         .route("/register", post(handlers::register))
         .route("/refresh", post(handlers::refresh_token))
-        .route("/logout", post(handlers::logout))
         .route("/verify-email/:token", get(handlers::verify_email))
         .route(
             "/request-password-reset",
             post(handlers::request_password_reset),
         )
         .route("/reset-password", post(handlers::reset_password))
-        .route("/me", get(handlers::get_current_user))
         .route("/oauth/:provider", get(handlers::oauth_start))
-        .route("/oauth/:provider/callback", get(handlers::oauth_callback))
-        .with_state(Arc::new(state))
+        .route("/oauth/:provider/callback", get(handlers::oauth_callback));
+
+    // Auth required routes
+    let auth_routes = Router::new()
+        .route("/logout", post(handlers::logout))
+        .route("/me", get(handlers::get_current_user))
+        .route_layer(middleware::from_fn_with_state(
+            (repos, token_service),
+            require_auth,
+        ));
+
+    // Merge all routes
+    public_routes.merge(auth_routes).with_state(state)
 }
