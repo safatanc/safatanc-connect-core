@@ -1,0 +1,14 @@
+### Variables
+@baseUrl = http://localhost:8080
+
+### OAuth Start - Google
+GET {{baseUrl}}/auth/oauth/google
+
+### OAuth Callback - Google
+GET {{baseUrl}}/auth/oauth/google/callback?code=authorization_code_here
+
+### OAuth Start - GitHub
+GET {{baseUrl}}/auth/oauth/github
+
+### OAuth Callback - GitHub
+GET {{baseUrl}}/auth/oauth/github/callback?code=authorization_code_here 

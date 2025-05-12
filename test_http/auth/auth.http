@@ -1,0 +1,40 @@
+
+### Variables
+@baseUrl = http://localhost:8080
+@authToken = eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIzZGI3Y2NhZi1hNmZmLTQ1ODgtODk4Ni1mY2ZhMjUwNzNjYTAiLCJleHAiOjE3NDcwMTYyNDYsImlhdCI6MTc0NzAxMjY0NiwiZW1haWwiOiJ0ZXN0QGV4YW1wbGUuY29tIiwicm9sZSI6InVzZXIifQ.DX9btmg8GB5r2rEgOdYvNHbo8ah-1Aafz01jwHYLt_k
+@refreshToken = your_refresh_token_here
+
+### Register a new user
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "email": "test@example.com",
+  "password": "Password123!",
+  "name": "Test User"
+}
+
+### Login
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "test@example.com",
+  "password": "Password123!"
+}
+
+### Get current user info
+GET {{baseUrl}}/auth/me
+Authorization: Bearer {{authToken}}
+
+### Refresh Token
+POST {{baseUrl}}/auth/refresh
+Content-Type: application/json
+
+{
+  "refresh_token": "{{refreshToken}}"
+}
+
+### Logout
+POST {{baseUrl}}/auth/logout
+Authorization: Bearer {{authToken}} 

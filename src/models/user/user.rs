@@ -21,6 +21,9 @@ pub struct User {
     pub deleted_at: Option<NaiveDateTime>,
 }
 
+pub const GLOBAL_ROLE_ADMIN: &str = "ADMIN";
+pub const GLOBAL_ROLE_USER: &str = "USER";
+
 #[derive(Debug, Deserialize)]
 pub struct CreateUserDto {
     pub email: String,

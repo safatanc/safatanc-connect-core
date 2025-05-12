@@ -3,7 +3,7 @@ use sqlx::{postgres::PgQueryResult, PgPool};
 use uuid::Uuid;
 
 use crate::db::error::{DatabaseError, DatabaseResult};
-use crate::models::user::{CreateUserDto, UpdateUserDto, User};
+use crate::models::user::{CreateUserDto, UpdateUserDto, User, GLOBAL_ROLE_USER};
 
 #[derive(Clone)]
 pub struct UserRepository {
@@ -35,9 +35,9 @@ impl UserRepository {
             password_hash,
             dto.full_name,
             dto.avatar_url,
-            "user", // Default role
-            false,  // Email not verified by default
-            true,   // User active by default
+            GLOBAL_ROLE_USER, // Default role
+            false,            // Email not verified by default
+            true,             // User active by default
         )
         .fetch_one(&self.pool)
         .await

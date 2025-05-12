@@ -14,19 +14,13 @@ use tower_http::cors::{Any, CorsLayer};
 
 use crate::config::AppConfig;
 use crate::db::repositories::Repositories;
-use crate::errors::ErrorResponse;
+use crate::models::response::error_response;
 use crate::services::auth::{AuthService, TokenService};
 use crate::services::user::UserManagementService;
 
 // Handler for unmatched routes (404 Not Found)
 async fn handle_404() -> impl IntoResponse {
-    let status = StatusCode::NOT_FOUND;
-    let response = ErrorResponse {
-        status: status.to_string(),
-        message: "Resource not found".to_string(),
-    };
-
-    (status, Json(response))
+    error_response(StatusCode::NOT_FOUND, "Resource not found".to_string())
 }
 
 // Function to configure all API routes
@@ -81,14 +75,10 @@ pub fn configure_api(
         .layer(axum::middleware::map_response(
             |res: axum::response::Response| async move {
                 if res.status() == StatusCode::METHOD_NOT_ALLOWED {
-                    return (
+                    return error_response(
                         StatusCode::METHOD_NOT_ALLOWED,
-                        Json(ErrorResponse {
-                            status: StatusCode::METHOD_NOT_ALLOWED.to_string(),
-                            message: "Method not allowed for this endpoint".to_string(),
-                        }),
-                    )
-                        .into_response();
+                        "Method not allowed for this endpoint".to_string(),
+                    );
                 }
                 res
             },

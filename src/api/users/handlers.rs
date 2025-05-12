@@ -12,6 +12,7 @@ use crate::config::AppConfig;
 use crate::db::repositories::Repositories;
 use crate::errors::AppResult;
 use crate::middleware::auth::Claims;
+use crate::models::response::success_response;
 use crate::models::user::{CreateUserDto, UpdateUserDto, UserResponse};
 use crate::services::auth::AuthService;
 use crate::services::user::UserManagementService;
@@ -80,7 +81,7 @@ pub async fn list_users(
         pages,
     };
 
-    Ok((StatusCode::OK, Json(response)))
+    Ok(success_response(StatusCode::OK, response))
 }
 
 // Get current user
@@ -95,7 +96,7 @@ pub async fn get_current_user(
 ) -> AppResult<impl IntoResponse> {
     let user_id = Uuid::parse_str(&claims.sub).unwrap();
     let user = user_management.get_user_by_id(user_id).await?;
-    Ok((StatusCode::OK, Json(user)))
+    Ok(success_response(StatusCode::OK, user))
 }
 
 // Get user by ID
@@ -117,7 +118,7 @@ pub async fn get_user(
     }
 
     let user = user_management.get_user_by_id(id).await?;
-    Ok((StatusCode::OK, Json(user)))
+    Ok(success_response(StatusCode::OK, user))
 }
 
 // Create a new user (admin only)
@@ -141,7 +142,7 @@ pub async fn create_user(
     let user = user_management.register_user(create_dto).await?;
     let user_response = UserResponse::from(user);
 
-    Ok((StatusCode::CREATED, Json(user_response)))
+    Ok(success_response(StatusCode::CREATED, user_response))
 }
 
 // Update user
@@ -171,7 +172,7 @@ pub async fn update_user(
     }
 
     let user = user_management.update_user(id, update_dto).await?;
-    Ok((StatusCode::OK, Json(user)))
+    Ok(success_response(StatusCode::OK, user))
 }
 
 // Delete user (soft delete)
@@ -193,7 +194,10 @@ pub async fn delete_user(
     }
 
     user_management.delete_user(id).await?;
-    Ok(StatusCode::NO_CONTENT)
+    Ok(success_response(
+        StatusCode::OK,
+        serde_json::json!({ "message": "User successfully deleted" }),
+    ))
 }
 
 // Update password
@@ -223,5 +227,8 @@ pub async fn update_password(
         )
         .await?;
 
-    Ok(StatusCode::NO_CONTENT)
+    Ok(success_response(
+        StatusCode::OK,
+        serde_json::json!({ "message": "Password updated successfully" }),
+    ))
 }

@@ -1,0 +1,36 @@
+### Variables
+@baseUrl = http://localhost:8080
+@authToken = your_auth_token_here
+
+### List all users
+GET {{baseUrl}}/users
+Authorization: Bearer {{authToken}}
+
+### Create a new user (admin)
+POST {{baseUrl}}/users
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "email": "newuser@example.com",
+  "password": "Password123!",
+  "name": "New User"
+}
+
+### Get user by ID
+GET {{baseUrl}}/users/user_id_here
+Authorization: Bearer {{authToken}}
+
+### Update user
+PUT {{baseUrl}}/users/user_id_here
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "name": "Updated User Name",
+  "email": "updated@example.com"
+}
+
+### Delete user
+DELETE {{baseUrl}}/users/user_id_here
+Authorization: Bearer {{authToken}} 

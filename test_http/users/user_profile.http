@@ -1,0 +1,27 @@
+### Variables
+@baseUrl = http://localhost:8080
+@authToken = your_auth_token_here
+
+### Get current logged-in user
+GET {{baseUrl}}/users/me
+Authorization: Bearer {{authToken}}
+
+### Update password
+PUT {{baseUrl}}/users/user_id_here/password
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "current_password": "Password123!",
+  "new_password": "NewPassword456!"
+}
+
+### Update current user profile
+PUT {{baseUrl}}/users/me
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "name": "My Updated Name",
+  "email": "my.updated.email@example.com"
+} 

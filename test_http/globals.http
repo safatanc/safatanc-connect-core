@@ -1,0 +1,16 @@
+# @name globals
+@baseUrl = http://localhost:8080
+
+### Authentication
+# After login, set the auth token here
+@authToken = your_auth_token_here
+@refreshToken = your_refresh_token_here
+
+### User IDs
+@userId = your_user_id_here
+
+### For testing reset password functionality
+@resetToken = your_reset_token_here
+
+### For testing email verification
+@verificationToken = your_verification_token_here 

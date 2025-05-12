@@ -5,6 +5,7 @@ use axum::response::IntoResponse;
 use axum::{
     extract::{Path, Query, State},
     http::StatusCode,
+    response::Response,
     Json,
 };
 use axum_extra::extract::TypedHeader;
@@ -12,8 +13,9 @@ use axum_extra::headers::authorization::Bearer;
 use axum_extra::headers::Authorization;
 
 use super::routes::AuthApiState;
-use crate::errors::{AppError, ErrorResponse};
+use crate::errors::AppError;
 use crate::models::auth::token::VerificationToken;
+use crate::models::response::{error_response, success_response, ErrorResponse};
 use crate::models::user::{
     AuthResponse, CreateUserDto, LoginDto, PasswordResetDto, PasswordResetRequestDto, UserResponse,
 };
@@ -27,21 +29,14 @@ pub async fn login(
     let data = match data {
         Ok(data) => data,
         Err(err) => {
-            return (
-                StatusCode::BAD_REQUEST,
-                Json(ErrorResponse {
-                    status: StatusCode::BAD_REQUEST.to_string(),
-                    message: format!("Invalid request: {}", err),
-                }),
-            )
-                .into_response()
+            return error_response(StatusCode::BAD_REQUEST, format!("Invalid request: {}", err));
         }
     };
 
     // Handle login
     match state.auth_service.login(&data.0).await {
-        Ok(response) => (StatusCode::OK, Json(response)).into_response(),
-        Err(err) => handle_error(&err).into_response(),
+        Ok(response) => success_response(StatusCode::OK, response),
+        Err(err) => handle_error(&err),
     }
 }
 
@@ -54,14 +49,7 @@ pub async fn register(
     let data = match data {
         Ok(data) => data,
         Err(err) => {
-            return (
-                StatusCode::BAD_REQUEST,
-                Json(ErrorResponse {
-                    status: StatusCode::BAD_REQUEST.to_string(),
-                    message: format!("Invalid request: {}", err),
-                }),
-            )
-                .into_response()
+            return error_response(StatusCode::BAD_REQUEST, format!("Invalid request: {}", err));
         }
     };
 
@@ -75,9 +63,9 @@ pub async fn register(
             // We don't send the token directly in the response
             // Instead, we would typically send an email with the verification link
             // For now, just return the created user
-            (StatusCode::CREATED, Json(UserResponse::from(user))).into_response()
+            success_response(StatusCode::CREATED, UserResponse::from(user))
         }
-        Err(err) => handle_error(&err).into_response(),
+        Err(err) => handle_error(&err),
     }
 }
 
@@ -93,13 +81,9 @@ pub async fn refresh_token(
     match state.auth_service.refresh_access_token(refresh_token).await {
         Ok(new_token) => {
             // Return just the new access token
-            (
-                StatusCode::OK,
-                Json(serde_json::json!({ "token": new_token })),
-            )
-                .into_response()
+            success_response(StatusCode::OK, serde_json::json!({ "token": new_token }))
         }
-        Err(err) => handle_error(&err).into_response(),
+        Err(err) => handle_error(&err),
     }
 }
 
@@ -111,13 +95,16 @@ pub async fn logout(
     // Verify the token and get the user ID
     let user_id = match state.auth_service.verify_token(bearer.token()) {
         Ok(user_id) => user_id,
-        Err(err) => return handle_error(&err).into_response(),
+        Err(err) => return handle_error(&err),
     };
 
     // Handle logout
     match state.auth_service.logout(user_id).await {
-        Ok(_) => StatusCode::NO_CONTENT.into_response(),
-        Err(err) => handle_error(&err).into_response(),
+        Ok(_) => success_response(
+            StatusCode::OK,
+            serde_json::json!({ "message": "Logged out successfully" }),
+        ),
+        Err(err) => handle_error(&err),
     }
 }
 
@@ -128,16 +115,14 @@ pub async fn verify_email(
 ) -> impl IntoResponse {
     // Get the token from the path
     match state.auth_service.verify_email_token(&token).await {
-        Ok(user) => (
+        Ok(user) => success_response(
             StatusCode::OK,
-            Json(serde_json::json!({
-                "status": "success",
+            serde_json::json!({
                 "message": "Email verified successfully",
                 "user": user
-            })),
-        )
-            .into_response(),
-        Err(err) => handle_error(&err).into_response(),
+            }),
+        ),
+        Err(err) => handle_error(&err),
     }
 }
 
@@ -150,14 +135,7 @@ pub async fn request_password_reset(
     let data = match data {
         Ok(data) => data,
         Err(err) => {
-            return (
-                StatusCode::BAD_REQUEST,
-                Json(ErrorResponse {
-                    status: StatusCode::BAD_REQUEST.to_string(),
-                    message: format!("Invalid request: {}", err),
-                }),
-            )
-                .into_response()
+            return error_response(StatusCode::BAD_REQUEST, format!("Invalid request: {}", err));
         }
     };
 
@@ -165,27 +143,23 @@ pub async fn request_password_reset(
     match state.auth_service.request_password_reset(&data.email).await {
         Ok(_) => {
             // Don't leak information about whether email exists
-            (
+            success_response(
                 StatusCode::OK,
-                Json(serde_json::json!({
-                    "status": "success",
+                serde_json::json!({
                     "message": "If the email exists, a password reset link has been sent"
-                })),
+                }),
             )
-                .into_response()
         }
         Err(err) => {
             // For security, even if there's an error, don't reveal it
             // Just log it internally and return a generic message
             eprintln!("Password reset request error: {:?}", err);
-            (
+            success_response(
                 StatusCode::OK,
-                Json(serde_json::json!({
-                    "status": "success",
+                serde_json::json!({
                     "message": "If the email exists, a password reset link has been sent"
-                })),
+                }),
             )
-                .into_response()
         }
     }
 }
@@ -199,14 +173,7 @@ pub async fn reset_password(
     let data = match data {
         Ok(data) => data,
         Err(err) => {
-            return (
-                StatusCode::BAD_REQUEST,
-                Json(ErrorResponse {
-                    status: StatusCode::BAD_REQUEST.to_string(),
-                    message: format!("Invalid request: {}", err),
-                }),
-            )
-                .into_response()
+            return error_response(StatusCode::BAD_REQUEST, format!("Invalid request: {}", err));
         }
     };
 
@@ -216,15 +183,13 @@ pub async fn reset_password(
         .reset_password(&data.token, &data.new_password)
         .await
     {
-        Ok(_) => (
+        Ok(_) => success_response(
             StatusCode::OK,
-            Json(serde_json::json!({
-                "status": "success",
+            serde_json::json!({
                 "message": "Password reset successful"
-            })),
-        )
-            .into_response(),
-        Err(err) => handle_error(&err).into_response(),
+            }),
+        ),
+        Err(err) => handle_error(&err),
     }
 }
 
@@ -236,13 +201,13 @@ pub async fn get_current_user(
     // Verify the token and get the user ID
     let user_id = match state.auth_service.verify_token(bearer.token()) {
         Ok(user_id) => user_id,
-        Err(err) => return handle_error(&err).into_response(),
+        Err(err) => return handle_error(&err),
     };
 
     // Get user details
     match state.user_management_service.get_user_by_id(user_id).await {
-        Ok(user) => (StatusCode::OK, Json(user)).into_response(),
-        Err(err) => handle_error(&err).into_response(),
+        Ok(user) => success_response(StatusCode::OK, user),
+        Err(err) => handle_error(&err),
     }
 }
 
@@ -252,12 +217,15 @@ pub async fn oauth_start(
     Path(provider): Path<String>,
 ) -> impl IntoResponse {
     match state.auth_service.get_oauth_redirect_url(&provider).await {
-        Ok(url) => axum::response::Redirect::to(&url).into_response(),
-        Err(err) => handle_error(&err).into_response(),
+        Ok(authorization_url) => success_response(
+            StatusCode::OK,
+            serde_json::json!({ "authorization_url": authorization_url.to_string() }),
+        ),
+        Err(err) => handle_error(&err),
     }
 }
 
-// OAuth callback handler - handles the callback from the provider
+// OAuth callback handler - processes the OAuth callback
 pub async fn oauth_callback(
     State(state): State<Arc<AuthApiState>>,
     Path(provider): Path<String>,
@@ -267,14 +235,10 @@ pub async fn oauth_callback(
     let code = match params.get("code") {
         Some(code) => code,
         None => {
-            return (
+            return error_response(
                 StatusCode::BAD_REQUEST,
-                Json(ErrorResponse {
-                    status: StatusCode::BAD_REQUEST.to_string(),
-                    message: "Missing authorization code".to_string(),
-                }),
-            )
-                .into_response()
+                "Missing authorization code".to_string(),
+            );
         }
     };
 
@@ -284,13 +248,13 @@ pub async fn oauth_callback(
         .handle_oauth_callback(&provider, code)
         .await
     {
-        Ok(auth_response) => (StatusCode::OK, Json(auth_response)).into_response(),
-        Err(err) => handle_error(&err).into_response(),
+        Ok(auth_response) => success_response(StatusCode::OK, auth_response),
+        Err(err) => handle_error(&err),
     }
 }
 
 // Helper function to handle errors
-fn handle_error(err: &AppError) -> (StatusCode, Json<ErrorResponse>) {
+fn handle_error(err: &AppError) -> Response {
     let status = match err {
         AppError::Validation(_) => StatusCode::BAD_REQUEST,
         AppError::Authentication(_) => StatusCode::UNAUTHORIZED,
@@ -302,11 +266,5 @@ fn handle_error(err: &AppError) -> (StatusCode, Json<ErrorResponse>) {
         AppError::Internal(_) => StatusCode::INTERNAL_SERVER_ERROR,
     };
 
-    (
-        status,
-        Json(ErrorResponse {
-            status: status.to_string(),
-            message: err.to_string(),
-        }),
-    )
+    error_response(status, err.to_string())
 }

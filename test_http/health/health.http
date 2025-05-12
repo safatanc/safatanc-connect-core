@@ -1,0 +1,14 @@
+### Variables
+@baseUrl = http://localhost:8080
+
+### Health Check
+GET {{baseUrl}}/health
+Accept: application/json
+
+### Server Status
+GET {{baseUrl}}/health/status
+Accept: application/json
+
+### Database Status
+GET {{baseUrl}}/health/database
+Accept: application/json 

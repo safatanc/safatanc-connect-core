@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::db::error::DatabaseError;
+use crate::models::response::error_response;
 
 #[derive(Debug, Error)]
 pub enum AppError {
@@ -35,12 +36,6 @@ pub enum AppError {
     Unexpected(String),
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct ErrorResponse {
-    pub status: String,
-    pub message: String,
-}
-
 impl IntoResponse for AppError {
     fn into_response(self) -> Response {
         let (status, message) = match self {
@@ -64,12 +59,7 @@ impl IntoResponse for AppError {
             AppError::Unexpected(msg) => (StatusCode::INTERNAL_SERVER_ERROR, msg),
         };
 
-        let body = Json(ErrorResponse {
-            status: status.to_string(),
-            message,
-        });
-
-        (status, body).into_response()
+        error_response(status, message)
     }
 }
 
