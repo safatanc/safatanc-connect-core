@@ -2,11 +2,10 @@ use argon2::{
     password_hash::{rand_core::OsRng, PasswordHash, PasswordHasher, PasswordVerifier, SaltString},
     Argon2,
 };
-use std::sync::Arc;
 use uuid::Uuid;
 use validator::Validate;
 
-use crate::db::error::{DatabaseError, DatabaseResult};
+use crate::db::error::DatabaseError;
 use crate::db::repositories::UserRepository;
 use crate::errors::AppError;
 use crate::models::user::{CreateUserDto, UpdateUserDto, User, UserResponse};

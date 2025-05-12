@@ -7,7 +7,6 @@ mod models;
 mod services;
 mod utils;
 
-use hyper::server::Server;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tracing::{info, Level};
@@ -17,6 +16,7 @@ use db::repositories::Repositories;
 use db::repositories::TokenRepository;
 use db::repositories::UserRepository;
 use services::auth::{AuthService, TokenService};
+use services::scheduler::SchedulerService;
 use services::user::UserManagementService;
 
 #[tokio::main]
@@ -55,6 +55,11 @@ async fn main() -> anyhow::Result<()> {
         token_service.clone(),
         user_management_service.clone(),
     ));
+
+    // Initialize and start scheduler service
+    let scheduler = SchedulerService::new(repos.clone());
+    scheduler.start_background_tasks();
+    info!("Background tasks started");
 
     // Initialize API router
     let app = api::configure_api(

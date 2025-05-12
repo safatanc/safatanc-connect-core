@@ -3,7 +3,6 @@ use std::time::Duration;
 use tokio::time;
 
 use crate::db::repositories::Repositories;
-use crate::errors::AppError;
 
 pub struct SchedulerService {
     repos: Arc<Repositories>,
