@@ -1,48 +1,31 @@
 # Builder stage
-FROM rust:1.77-slim-bookworm as builder
+FROM rust:1.86-slim-bookworm as builder
 
-WORKDIR /usr/src/app
+WORKDIR /app
 
-# Install minimal build dependencies
-RUN apt-get update && \
-  apt-get install -y \
-  pkg-config \
-  libssl-dev \
-  && rm -rf /var/lib/apt/lists/*
+# Install minimal dependencies
+RUN apt-get update && apt-get install -y pkg-config && rm -rf /var/lib/apt/lists/*
 
-# Create empty project for caching dependencies
-RUN cargo init --lib
-COPY Cargo.toml Cargo.lock ./
-RUN cargo fetch
+# Copy source code
+COPY . .
 
-# Copy and build
-COPY src ./src
+# Build the application
 RUN cargo build --release
 
 # Runtime stage
 FROM debian:bookworm-slim
 
-# Install SSL certificates for HTTPS requests
-RUN apt-get update && \
-  apt-get install -y ca-certificates && \
-  rm -rf /var/lib/apt/lists/*
+WORKDIR /app
 
-WORKDIR /usr/local/bin
-
-# Copy the binary from builder
-COPY --from=builder /usr/src/app/target/release/safatanc-connect-core ./app
-
-# Create a non-root user
-RUN useradd -m -u 1001 appuser
-USER appuser
+# Copy only the binary
+COPY --from=builder /app/target/release/safatanc-connect-core .
 
 # Set environment variables
-ARG APP_ENVIRONMENT=production
 ENV RUST_LOG=info
-ENV APP_ENVIRONMENT=${APP_ENVIRONMENT}
+ENV APP_ENVIRONMENT=production
 
-# Expose the port the app runs on
+# Expose the port
 EXPOSE 8080
 
 # Run the binary
-CMD ["./app"] 
+CMD ["./safatanc-connect-core"] 
