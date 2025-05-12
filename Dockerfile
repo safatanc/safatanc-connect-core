@@ -6,10 +6,7 @@ WORKDIR /app
 # Install minimal dependencies including OpenSSL
 RUN apt-get update && apt-get install -y pkg-config libssl-dev && rm -rf /var/lib/apt/lists/*
 
-# Copy .env file first
-COPY .env ./
-
-# Copy source code
+# Copy all source code including .env
 COPY . .
 
 # Build the application
@@ -26,8 +23,8 @@ RUN apt-get update && apt-get install -y libssl3 ca-certificates && rm -rf /var/
 # Copy only the binary
 COPY --from=builder /app/target/release/safatanc-connect-core .
 
-# Copy .env for runtime
-COPY .env ./
+# Copy .env from builder stage
+COPY --from=builder /app/.env ./
 
 # Set environment variables
 ENV RUST_LOG=info
