@@ -1,0 +1,116 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE oauth_providers\n            SET\n                display_name = COALESCE($1, display_name),\n                client_id = COALESCE($2, client_id),\n                client_secret = COALESCE($3, client_secret),\n                auth_url = COALESCE($4, auth_url),\n                token_url = COALESCE($5, token_url),\n                user_info_url = COALESCE($6, user_info_url),\n                redirect_url = COALESCE($7, redirect_url),\n                scope = COALESCE($8, scope),\n                is_active = COALESCE($9, is_active),\n                icon_url = $10,\n                updated_at = NOW()\n            WHERE id = $11 AND deleted_at IS NULL\n            RETURNING \n                id, provider_name, display_name, client_id, client_secret, \n                auth_url, token_url, user_info_url, redirect_url, scope, \n                is_active, icon_url, created_at, updated_at, deleted_at\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "provider_name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "display_name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "client_id",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 4,
+        "name": "client_secret",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 5,
+        "name": "auth_url",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 6,
+        "name": "token_url",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 7,
+        "name": "user_info_url",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 8,
+        "name": "redirect_url",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 9,
+        "name": "scope",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 10,
+        "name": "is_active",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 11,
+        "name": "icon_url",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 12,
+        "name": "created_at",
+        "type_info": "Timestamp"
+      },
+      {
+        "ordinal": 13,
+        "name": "updated_at",
+        "type_info": "Timestamp"
+      },
+      {
+        "ordinal": 14,
+        "name": "deleted_at",
+        "type_info": "Timestamp"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Bool",
+        "Varchar",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "53ae18226e41ae571d2042e14531fc332e60ebc9d1471e8579ff4a3bff2df56c"
+}

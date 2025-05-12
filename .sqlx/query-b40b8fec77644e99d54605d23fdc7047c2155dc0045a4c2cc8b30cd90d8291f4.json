@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE verification_tokens\n            SET\n                used_at = $1,\n                updated_at = NOW()\n            WHERE user_id = $2 AND type = $3 AND used_at IS NULL\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Timestamp",
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "b40b8fec77644e99d54605d23fdc7047c2155dc0045a4c2cc8b30cd90d8291f4"
+}
