@@ -1,15 +1,5 @@
 use std::sync::Arc;
 
-use axum::{
-    extract::{Path, Query, State},
-    http::StatusCode,
-    response::Response,
-    Json,
-};
-use serde::Deserialize;
-use uuid::Uuid;
-use validator::Validate;
-
 use crate::db::repositories::Repositories;
 use crate::errors::AppError;
 use crate::models::badge::{CreateBadgeDto, UpdateBadgeDto};
@@ -18,6 +8,14 @@ use crate::models::common::PaginationQuery;
 use crate::models::user::AwardBadgeDto;
 use crate::services::badge::BadgeService;
 use crate::services::validation::validation_err_to_app_error;
+use axum::{
+    extract::{Path, Query, State},
+    http::StatusCode,
+    response::Response,
+    Json,
+};
+use uuid::Uuid;
+use validator::Validate;
 
 // Handler to get all badges with pagination
 pub async fn get_badges(

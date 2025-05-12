@@ -7,11 +7,9 @@ use axum::{
     response::Response,
     Json,
 };
-use serde::{Deserialize, Serialize};
 use validator::Validate;
 
 use super::routes::AuthApiState;
-use crate::db::repositories::Repositories;
 use crate::errors::AppError;
 use crate::middleware::auth::Claims;
 use crate::models::auth::oauth::OAuthCallbackQuery;
@@ -116,7 +114,7 @@ pub async fn request_password_reset(
         .ok_or_else(|| AppError::Validation("Email is required".to_string()))?;
 
     // Call service to request password reset
-    let token = state.auth_service.request_password_reset(email).await?;
+    let _token = state.auth_service.request_password_reset(email).await?;
 
     // In a real application, you would send an email with the reset link
     // For simplicity, we'll just acknowledge the request

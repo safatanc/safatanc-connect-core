@@ -6,7 +6,6 @@ mod users;
 use std::sync::Arc;
 
 use axum::{
-    handler::Handler,
     http::{Method, StatusCode},
     response::IntoResponse,
     Router,

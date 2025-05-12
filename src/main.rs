@@ -75,11 +75,11 @@ async fn main() -> anyhow::Result<()> {
     );
     info!("API routes configured");
 
-    // Start server
-    let addr = SocketAddr::from(([0, 0, 0, 0], config.server_port));
-    info!("Starting server on http://localhost:{}", config.server_port);
+    // Configure server
+    let addr = format!("{}:{}", config.server_host, config.server_port);
+    let listener = tokio::net::TcpListener::bind(&addr).await?;
+    info!("Starting server on http://{}", addr);
 
-    let listener = tokio::net::TcpListener::bind(addr).await?;
     axum::serve(listener, app).await?;
 
     Ok(())

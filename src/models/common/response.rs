@@ -68,21 +68,3 @@ impl ApiResponse {
         (status_code, Json(response)).into_response()
     }
 }
-
-pub fn success_response<T: Serialize>(status_code: StatusCode, data: T) -> Response {
-    let response = SuccessResponse {
-        status: status_code.to_string(),
-        data,
-    };
-
-    (status_code, Json(response)).into_response()
-}
-
-pub fn error(status_code: StatusCode, message: String) -> Response {
-    let response = ErrorResponse {
-        status: status_code.to_string(),
-        message,
-    };
-
-    (status_code, Json(response)).into_response()
-}

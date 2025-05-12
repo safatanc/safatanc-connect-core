@@ -15,7 +15,6 @@ use super::handlers;
 
 // Auth API State struct
 pub struct AuthApiState {
-    pub repos: Arc<Repositories>,
     pub token_service: Arc<TokenService>,
     pub user_management_service: Arc<UserManagementService>,
     pub auth_service: Arc<AuthService>,
@@ -29,7 +28,6 @@ pub fn configure(
     auth_service: Arc<AuthService>,
 ) -> Router {
     let state = Arc::new(AuthApiState {
-        repos: repos.clone(),
         token_service: token_service.clone(),
         user_management_service,
         auth_service,
