@@ -1,8 +1,7 @@
-use chrono::{DateTime, NaiveDateTime, Utc};
+use chrono::NaiveDateTime;
 use serde::{Deserialize, Serialize};
-use sqlx::FromRow;
 use uuid::Uuid;
-use validator::{Validate, ValidationError};
+use validator::Validate;
 
 use crate::services::validation::{validate_email, validate_password_strength, validate_username};
 

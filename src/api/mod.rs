@@ -7,8 +7,7 @@ use std::sync::Arc;
 use axum::{
     handler::Handler,
     http::{Method, StatusCode},
-    response::{IntoResponse, Response},
-    Json, Router,
+    response::IntoResponse, Router,
 };
 use tower_http::cors::{Any, CorsLayer};
 

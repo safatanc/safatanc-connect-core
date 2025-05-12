@@ -3,7 +3,6 @@ pub mod session;
 pub mod token;
 pub mod user;
 
-use std::sync::Arc;
 use sqlx::PgPool;
 
 pub use oauth::*;

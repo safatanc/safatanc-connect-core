@@ -15,7 +15,7 @@ use crate::models::response::success_response;
 use crate::models::user::{CreateUserDto, UpdateUserDto, UserResponse, GLOBAL_ROLE_ADMIN};
 use crate::services::auth::AuthService;
 use crate::services::user::UserManagementService;
-use crate::{config::AppConfig, models::GLOBAL_ROLE_USER};
+use crate::config::AppConfig;
 
 // Request and response types
 #[derive(Debug, Deserialize)]

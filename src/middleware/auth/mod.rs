@@ -2,11 +2,10 @@ use std::sync::Arc;
 
 use axum::{
     extract::{Request, State},
-    http::{header, StatusCode},
+    http::header,
     middleware::Next,
     response::Response,
 };
-use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::db::repositories::Repositories;

@@ -1,4 +1,3 @@
-use chrono::{DateTime, NaiveDateTime, Utc};
 use sqlx::{postgres::PgQueryResult, PgPool};
 use uuid::Uuid;
 

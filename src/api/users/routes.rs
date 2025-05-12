@@ -1,17 +1,14 @@
 use std::sync::Arc;
 
 use axum::{
-    extract::{Path, Query, State},
     middleware,
     routing::{delete, get, post, put},
     Router,
 };
-use uuid::Uuid;
 
 use crate::config::AppConfig;
 use crate::db::repositories::Repositories;
 use crate::middleware::auth::{require_admin, require_auth};
-use crate::models::user::{CreateUserDto, UpdateUserDto};
 use crate::services::auth::{AuthService, TokenService};
 use crate::services::user::UserManagementService;
 

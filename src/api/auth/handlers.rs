@@ -15,10 +15,9 @@ use validator::Validate;
 
 use super::routes::AuthApiState;
 use crate::errors::AppError;
-use crate::models::auth::token::VerificationToken;
-use crate::models::response::{error_response, success_response, ErrorResponse};
+use crate::models::response::{error_response, success_response};
 use crate::models::user::{
-    AuthResponse, CreateUserDto, LoginDto, PasswordResetDto, PasswordResetRequestDto, UserResponse,
+    CreateUserDto, LoginDto, PasswordResetDto, PasswordResetRequestDto, UserResponse,
 };
 use crate::services::validation::validation_err_to_app_error;
 
