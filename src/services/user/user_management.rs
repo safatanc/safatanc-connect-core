@@ -51,8 +51,8 @@ impl UserManagementService {
     // Get all users with pagination
     pub async fn get_all_users(
         &self,
-        page: u32,
-        limit: u32,
+        page: i64,
+        limit: i64,
     ) -> Result<(Vec<UserResponse>, u64), AppError> {
         // Calculate offset from page
         let offset = (page - 1) * limit;
@@ -60,7 +60,7 @@ impl UserManagementService {
         // Get users
         let users = self
             .user_repo
-            .find_all(limit as i64, offset as i64)
+            .find_all(limit, offset)
             .await
             .map_err(AppError::Database)?;
 
@@ -120,6 +120,27 @@ impl UserManagementService {
             .update_password(id, &new_password_hash)
             .await
             .map_err(AppError::Database)?;
+
+        Ok(())
+    }
+
+    // Update user password directly (for admin)
+    pub async fn update_user_password(&self, id: Uuid, new_password: &str) -> Result<(), AppError> {
+        // Validate new password
+        crate::services::validation::validate_password_strength(new_password)
+            .map_err(|e| AppError::Validation(e.to_string()))?;
+
+        // Hash new password
+        let new_password_hash = self.hash_password(new_password)?;
+
+        // Update password in database
+        self.user_repo
+            .update_password(id, &new_password_hash)
+            .await
+            .map_err(|e| match e {
+                DatabaseError::NotFound => AppError::NotFound("User not found".into()),
+                _ => AppError::Database(e),
+            })?;
 
         Ok(())
     }

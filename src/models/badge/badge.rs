@@ -1,9 +1,9 @@
 use chrono::NaiveDateTime;
 use serde::{Deserialize, Serialize};
-use sqlx::FromRow;
 use uuid::Uuid;
+use validator::Validate;
 
-#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Badge {
     pub id: Uuid,
     pub name: String,
@@ -14,36 +14,39 @@ pub struct Badge {
     pub deleted_at: Option<NaiveDateTime>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
-pub struct UserBadge {
-    pub id: Uuid,
-    pub user_id: Uuid,
-    pub badge_id: Uuid,
-    pub created_at: NaiveDateTime,
-    pub updated_at: NaiveDateTime,
-    pub deleted_at: Option<NaiveDateTime>,
+#[derive(Debug, Deserialize, Validate)]
+pub struct CreateBadgeDto {
+    #[validate(length(
+        min = 1,
+        max = 100,
+        message = "Badge name must be between 1 and 100 characters"
+    ))]
+    pub name: String,
+
+    pub description: Option<String>,
+    pub image_url: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Deserialize, Validate)]
+pub struct UpdateBadgeDto {
+    #[validate(length(
+        min = 1,
+        max = 100,
+        message = "Badge name must be between 1 and 100 characters"
+    ))]
+    pub name: Option<String>,
+
+    pub description: Option<String>,
+    pub image_url: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
 pub struct BadgeResponse {
     pub id: Uuid,
     pub name: String,
     pub description: Option<String>,
     pub image_url: Option<String>,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct CreateBadgeDto {
-    pub name: String,
-    pub description: Option<String>,
-    pub image_url: Option<String>,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct UpdateBadgeDto {
-    pub name: Option<String>,
-    pub description: Option<String>,
-    pub image_url: Option<String>,
+    pub created_at: NaiveDateTime,
 }
 
 // Implementation of From trait for converting from Badge to BadgeResponse
@@ -54,6 +57,7 @@ impl From<Badge> for BadgeResponse {
             name: badge.name,
             description: badge.description,
             image_url: badge.image_url,
+            created_at: badge.created_at,
         }
     }
 }

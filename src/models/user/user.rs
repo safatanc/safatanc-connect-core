@@ -75,6 +75,15 @@ pub struct PasswordResetDto {
     pub new_password: String,
 }
 
+#[derive(Debug, Deserialize, Validate)]
+pub struct UpdatePasswordDto {
+    #[validate(length(min = 1, message = "Current password is required"))]
+    pub current_password: String,
+
+    #[validate(custom = "validate_password_strength")]
+    pub new_password: String,
+}
+
 #[derive(Debug, Serialize)]
 pub struct UserResponse {
     pub id: Uuid,

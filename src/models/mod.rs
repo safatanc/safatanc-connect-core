@@ -1,5 +1,4 @@
 pub mod auth;
-pub mod response;
+pub mod badge;
+pub mod common;
 pub mod user;
-
-pub use user::*;

@@ -5,7 +5,7 @@ use axum::{
 use thiserror::Error;
 
 use crate::db::error::DatabaseError;
-use crate::models::response::error_response;
+use crate::models::common::response::ApiResponse;
 
 #[derive(Debug, Error)]
 pub enum AppError {
@@ -57,7 +57,7 @@ impl IntoResponse for AppError {
             AppError::Unexpected(msg) => (StatusCode::INTERNAL_SERVER_ERROR, msg),
         };
 
-        error_response(status, message)
+        ApiResponse::error(status, message)
     }
 }
 

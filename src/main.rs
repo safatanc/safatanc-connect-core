@@ -16,6 +16,7 @@ use db::repositories::Repositories;
 use db::repositories::TokenRepository;
 use db::repositories::UserRepository;
 use services::auth::{AuthService, TokenService};
+use services::badge::BadgeService;
 use services::scheduler::SchedulerService;
 use services::user::UserManagementService;
 
@@ -55,6 +56,8 @@ async fn main() -> anyhow::Result<()> {
         token_service.clone(),
         user_management_service.clone(),
     ));
+    let badge_service = Arc::new(BadgeService::new(repos.clone()));
+    info!("Services initialized");
 
     // Initialize and start scheduler service
     let scheduler = SchedulerService::new(repos.clone());
@@ -68,6 +71,7 @@ async fn main() -> anyhow::Result<()> {
         token_service.clone(),
         user_management_service.clone(),
         auth_service.clone(),
+        badge_service.clone(),
     );
     info!("API routes configured");
 

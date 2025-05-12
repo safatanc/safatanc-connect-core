@@ -3,51 +3,21 @@ use std::sync::Arc;
 use axum::{
     extract::{Extension, Json, Path, Query, State},
     http::StatusCode,
-    response::IntoResponse,
+    response::{IntoResponse, Response},
 };
-use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+use crate::config::AppConfig;
 use crate::db::repositories::Repositories;
-use crate::errors::AppResult;
+use crate::errors::{AppError, AppResult};
 use crate::middleware::auth::Claims;
-use crate::models::response::success_response;
-use crate::models::user::{CreateUserDto, UpdateUserDto, UserResponse, GLOBAL_ROLE_ADMIN};
+use crate::models::common::pagination::PaginationQuery;
+use crate::models::common::response::{ApiResponse, PaginatedResponse};
+use crate::models::user::{
+    CreateUserDto, UpdatePasswordDto, UpdateUserDto, UserResponse, GLOBAL_ROLE_ADMIN,
+};
 use crate::services::auth::AuthService;
 use crate::services::user::UserManagementService;
-use crate::config::AppConfig;
-
-// Request and response types
-#[derive(Debug, Deserialize)]
-pub struct PaginationQuery {
-    #[serde(default = "default_page")]
-    pub page: u32,
-    #[serde(default = "default_limit")]
-    pub limit: u32,
-}
-
-fn default_page() -> u32 {
-    1
-}
-
-fn default_limit() -> u32 {
-    10
-}
-
-#[derive(Debug, Serialize)]
-pub struct PaginatedResponse<T> {
-    pub data: Vec<T>,
-    pub total: u64,
-    pub page: u32,
-    pub limit: u32,
-    pub pages: u64,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct UpdatePasswordRequest {
-    pub current_password: String,
-    pub new_password: String,
-}
 
 // Get all users with pagination
 pub async fn list_users(
@@ -59,23 +29,23 @@ pub async fn list_users(
         Arc<UserManagementService>,
         Arc<AuthService>,
     )>,
-) -> AppResult<impl IntoResponse> {
+) -> Result<Response, AppError> {
     // Admin check is now handled by middleware
     let (users, total) = user_management
         .get_all_users(pagination.page, pagination.limit)
         .await?;
 
-    let pages = (total as f64 / pagination.limit as f64).ceil() as u64;
+    let total_pages = (total as f64 / pagination.limit as f64).ceil() as i64;
 
     let response = PaginatedResponse {
         data: users,
-        total,
+        total: total as i64,
         page: pagination.page,
         limit: pagination.limit,
-        pages,
+        total_pages,
     };
 
-    Ok(success_response(StatusCode::OK, response))
+    Ok(ApiResponse::success(StatusCode::OK, response))
 }
 
 // Get current user
@@ -87,10 +57,10 @@ pub async fn get_current_user(
         Arc<UserManagementService>,
         Arc<AuthService>,
     )>,
-) -> AppResult<impl IntoResponse> {
+) -> Result<Response, AppError> {
     let user_id = Uuid::parse_str(&claims.sub).unwrap();
     let user = user_management.get_user_by_id(user_id).await?;
-    Ok(success_response(StatusCode::OK, user))
+    Ok(ApiResponse::success(StatusCode::OK, user))
 }
 
 // Get user by ID
@@ -103,7 +73,7 @@ pub async fn get_user(
         Arc<UserManagementService>,
         Arc<AuthService>,
     )>,
-) -> AppResult<impl IntoResponse> {
+) -> Result<Response, AppError> {
     // Users can only access their own data, unless they are admin
     if claims.sub != id.to_string() && claims.role != GLOBAL_ROLE_ADMIN {
         return Err(crate::errors::AppError::Authorization(
@@ -112,7 +82,7 @@ pub async fn get_user(
     }
 
     let user = user_management.get_user_by_id(id).await?;
-    Ok(success_response(StatusCode::OK, user))
+    Ok(ApiResponse::success(StatusCode::OK, user))
 }
 
 // Create a new user (admin only)
@@ -125,12 +95,12 @@ pub async fn create_user(
         Arc<AuthService>,
     )>,
     Json(create_dto): Json<CreateUserDto>,
-) -> AppResult<impl IntoResponse> {
+) -> Result<Response, AppError> {
     // Admin check is now handled by middleware
     let user = user_management.register_user(create_dto).await?;
     let user_response = UserResponse::from(user);
 
-    Ok(success_response(StatusCode::CREATED, user_response))
+    Ok(ApiResponse::created(user_response))
 }
 
 // Update current user
@@ -143,7 +113,7 @@ pub async fn update_current_user(
         Arc<AuthService>,
     )>,
     Json(update_dto): Json<UpdateUserDto>,
-) -> AppResult<impl IntoResponse> {
+) -> Result<Response, AppError> {
     let user_id = Uuid::parse_str(&claims.sub).unwrap();
 
     // If not admin, they can't modify the is_active field
@@ -154,7 +124,7 @@ pub async fn update_current_user(
     }
 
     let user = user_management.update_user(user_id, update_dto).await?;
-    Ok(success_response(StatusCode::OK, user))
+    Ok(ApiResponse::success(StatusCode::OK, user))
 }
 
 // Update user
@@ -168,7 +138,7 @@ pub async fn update_user(
         Arc<AuthService>,
     )>,
     Json(update_dto): Json<UpdateUserDto>,
-) -> AppResult<impl IntoResponse> {
+) -> Result<Response, AppError> {
     // Users can only update their own data, unless they are admin
     if claims.sub != id.to_string() && claims.role != GLOBAL_ROLE_ADMIN {
         return Err(crate::errors::AppError::Authorization(
@@ -184,7 +154,7 @@ pub async fn update_user(
     }
 
     let user = user_management.update_user(id, update_dto).await?;
-    Ok(success_response(StatusCode::OK, user))
+    Ok(ApiResponse::success(StatusCode::OK, user))
 }
 
 // Delete user (soft delete)
@@ -197,29 +167,26 @@ pub async fn delete_user(
         Arc<UserManagementService>,
         Arc<AuthService>,
     )>,
-) -> AppResult<impl IntoResponse> {
-    // Admin check is now handled by middleware
+) -> Result<Response, AppError> {
+    // Admin check is handled by middleware
     user_management.delete_user(id).await?;
-    Ok(success_response(
-        StatusCode::OK,
-        serde_json::json!({ "message": "User successfully deleted" }),
-    ))
+    Ok(ApiResponse::no_content())
 }
 
-// Update current user password
+// Update current user's password
 pub async fn update_current_user_password(
     Extension(claims): Extension<Claims>,
-    Path(id): Path<Uuid>,
-    State((_, _, user_management, _)): State<(
+    State((_, _, user_management, auth_service)): State<(
         Arc<Repositories>,
         AppConfig,
         Arc<UserManagementService>,
         Arc<AuthService>,
     )>,
-    Json(password_request): Json<UpdatePasswordRequest>,
-) -> AppResult<impl IntoResponse> {
+    Json(password_request): Json<UpdatePasswordDto>,
+) -> Result<Response, AppError> {
     let user_id = Uuid::parse_str(&claims.sub).unwrap();
 
+    // Use the user management service to update the password
     user_management
         .update_password(
             user_id,
@@ -228,41 +195,49 @@ pub async fn update_current_user_password(
         )
         .await?;
 
-    Ok(success_response(
+    Ok(ApiResponse::success(
         StatusCode::OK,
-        serde_json::json!({ "message": "Password updated successfully" }),
+        "Password updated successfully",
     ))
 }
 
-// Update password
+// Update any user's password (admin only)
 pub async fn update_user_password(
     Extension(claims): Extension<Claims>,
     Path(id): Path<Uuid>,
-    State((_, _, user_management, _)): State<(
+    State((_, _, user_management, auth_service)): State<(
         Arc<Repositories>,
         AppConfig,
         Arc<UserManagementService>,
         Arc<AuthService>,
     )>,
-    Json(password_request): Json<UpdatePasswordRequest>,
-) -> AppResult<impl IntoResponse> {
-    // Users can only update their own password
-    if claims.sub != id.to_string() {
+    Json(password_request): Json<UpdatePasswordDto>,
+) -> Result<Response, AppError> {
+    // Only admin can change other users' passwords
+    if claims.sub != id.to_string() && claims.role != GLOBAL_ROLE_ADMIN {
         return Err(crate::errors::AppError::Authorization(
             "Access denied. You can only change your own password.".into(),
         ));
     }
 
-    user_management
-        .update_password(
-            id,
-            &password_request.current_password,
-            &password_request.new_password,
-        )
-        .await?;
+    // If it's admin changing another user's password, we don't need to verify the current password
+    if claims.sub != id.to_string() && claims.role == GLOBAL_ROLE_ADMIN {
+        user_management
+            .update_user_password(id, &password_request.new_password)
+            .await?;
+    } else {
+        // For users changing their own passwords, we need to verify with the update_password method
+        user_management
+            .update_password(
+                id,
+                &password_request.current_password,
+                &password_request.new_password,
+            )
+            .await?;
+    }
 
-    Ok(success_response(
+    Ok(ApiResponse::success(
         StatusCode::OK,
-        serde_json::json!({ "message": "Password updated successfully" }),
+        "Password updated successfully",
     ))
 }
