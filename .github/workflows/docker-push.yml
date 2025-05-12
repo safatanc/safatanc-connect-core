@@ -33,3 +33,5 @@ jobs:
           context: .
           push: true
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/safatanc-connect-core:latest
+          build-args: |
+            APP_ENVIRONMENT=production
