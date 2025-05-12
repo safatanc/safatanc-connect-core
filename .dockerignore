@@ -14,8 +14,8 @@ debug/
 *.swo
 
 # Environment files
-.env
-.env.*
+# .env
+# .env.*
 
 # Documentation
 README.md

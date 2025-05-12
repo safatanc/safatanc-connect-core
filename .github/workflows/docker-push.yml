@@ -19,10 +19,6 @@ jobs:
         run: |
           echo "$ENV" > .env
           echo "File .env created:"
-          ls -la .env
-          echo "Direktori kerja saat ini:"
-          pwd
-          ls -la
         env:
           ENV: ${{ secrets.ENV }}
 
