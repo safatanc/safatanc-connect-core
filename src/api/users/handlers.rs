@@ -8,14 +8,14 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::config::AppConfig;
 use crate::db::repositories::Repositories;
 use crate::errors::AppResult;
 use crate::middleware::auth::Claims;
 use crate::models::response::success_response;
-use crate::models::user::{CreateUserDto, UpdateUserDto, UserResponse};
+use crate::models::user::{CreateUserDto, UpdateUserDto, UserResponse, GLOBAL_ROLE_ADMIN};
 use crate::services::auth::AuthService;
 use crate::services::user::UserManagementService;
+use crate::{config::AppConfig, models::GLOBAL_ROLE_USER};
 
 // Request and response types
 #[derive(Debug, Deserialize)]
@@ -60,13 +60,7 @@ pub async fn list_users(
         Arc<AuthService>,
     )>,
 ) -> AppResult<impl IntoResponse> {
-    // Only admin can list all users
-    if claims.role != "admin" {
-        return Err(crate::errors::AppError::Authorization(
-            "Access denied. Only administrators can view the user list.".into(),
-        ));
-    }
-
+    // Admin check is now handled by middleware
     let (users, total) = user_management
         .get_all_users(pagination.page, pagination.limit)
         .await?;
@@ -111,7 +105,7 @@ pub async fn get_user(
     )>,
 ) -> AppResult<impl IntoResponse> {
     // Users can only access their own data, unless they are admin
-    if claims.sub != id.to_string() && claims.role != "admin" {
+    if claims.sub != id.to_string() && claims.role != GLOBAL_ROLE_ADMIN {
         return Err(crate::errors::AppError::Authorization(
             "Access denied. You can only view your own data.".into(),
         ));
@@ -132,17 +126,35 @@ pub async fn create_user(
     )>,
     Json(create_dto): Json<CreateUserDto>,
 ) -> AppResult<impl IntoResponse> {
-    // Only admin can create users directly
-    if claims.role != "admin" {
-        return Err(crate::errors::AppError::Authorization(
-            "Access denied. Only administrators can create new users.".into(),
-        ));
-    }
-
+    // Admin check is now handled by middleware
     let user = user_management.register_user(create_dto).await?;
     let user_response = UserResponse::from(user);
 
     Ok(success_response(StatusCode::CREATED, user_response))
+}
+
+// Update current user
+pub async fn update_current_user(
+    Extension(claims): Extension<Claims>,
+    State((_, _, user_management, _)): State<(
+        Arc<Repositories>,
+        AppConfig,
+        Arc<UserManagementService>,
+        Arc<AuthService>,
+    )>,
+    Json(update_dto): Json<UpdateUserDto>,
+) -> AppResult<impl IntoResponse> {
+    let user_id = Uuid::parse_str(&claims.sub).unwrap();
+
+    // If not admin, they can't modify the is_active field
+    if claims.role != GLOBAL_ROLE_ADMIN && update_dto.is_active.is_some() {
+        return Err(crate::errors::AppError::Authorization(
+            "Access denied. Only administrators can change a user's active status.".into(),
+        ));
+    }
+
+    let user = user_management.update_user(user_id, update_dto).await?;
+    Ok(success_response(StatusCode::OK, user))
 }
 
 // Update user
@@ -158,14 +170,14 @@ pub async fn update_user(
     Json(update_dto): Json<UpdateUserDto>,
 ) -> AppResult<impl IntoResponse> {
     // Users can only update their own data, unless they are admin
-    if claims.sub != id.to_string() && claims.role != "admin" {
+    if claims.sub != id.to_string() && claims.role != GLOBAL_ROLE_ADMIN {
         return Err(crate::errors::AppError::Authorization(
             "Access denied. You can only modify your own data.".into(),
         ));
     }
 
     // If not admin, they can't modify the is_active field
-    if claims.role != "admin" && update_dto.is_active.is_some() {
+    if claims.role != GLOBAL_ROLE_ADMIN && update_dto.is_active.is_some() {
         return Err(crate::errors::AppError::Authorization(
             "Access denied. Only administrators can change a user's active status.".into(),
         ));
@@ -186,13 +198,7 @@ pub async fn delete_user(
         Arc<AuthService>,
     )>,
 ) -> AppResult<impl IntoResponse> {
-    // Only admin can delete users
-    if claims.role != "admin" {
-        return Err(crate::errors::AppError::Authorization(
-            "Access denied. Only administrators can delete users.".into(),
-        ));
-    }
-
+    // Admin check is now handled by middleware
     user_management.delete_user(id).await?;
     Ok(success_response(
         StatusCode::OK,
@@ -200,8 +206,36 @@ pub async fn delete_user(
     ))
 }
 
+// Update current user password
+pub async fn update_current_user_password(
+    Extension(claims): Extension<Claims>,
+    Path(id): Path<Uuid>,
+    State((_, _, user_management, _)): State<(
+        Arc<Repositories>,
+        AppConfig,
+        Arc<UserManagementService>,
+        Arc<AuthService>,
+    )>,
+    Json(password_request): Json<UpdatePasswordRequest>,
+) -> AppResult<impl IntoResponse> {
+    let user_id = Uuid::parse_str(&claims.sub).unwrap();
+
+    user_management
+        .update_password(
+            user_id,
+            &password_request.current_password,
+            &password_request.new_password,
+        )
+        .await?;
+
+    Ok(success_response(
+        StatusCode::OK,
+        serde_json::json!({ "message": "Password updated successfully" }),
+    ))
+}
+
 // Update password
-pub async fn update_password(
+pub async fn update_user_password(
     Extension(claims): Extension<Claims>,
     Path(id): Path<Uuid>,
     State((_, _, user_management, _)): State<(

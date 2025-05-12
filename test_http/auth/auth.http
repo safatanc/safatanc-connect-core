@@ -30,6 +30,7 @@ Authorization: Bearer {{authToken}}
 ### Refresh Token
 POST {{baseUrl}}/auth/refresh
 Content-Type: application/json
+Authorization: Bearer {{authToken}}
 
 {
   "refresh_token": "{{refreshToken}}"

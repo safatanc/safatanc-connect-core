@@ -11,6 +11,7 @@ use uuid::Uuid;
 
 use crate::db::repositories::Repositories;
 use crate::errors::AppError;
+use crate::models::user::GLOBAL_ROLE_ADMIN;
 use crate::services::auth::TokenService;
 
 // Claims re-export from token service
@@ -33,10 +34,11 @@ pub async fn require_auth(
     let user_id = Uuid::parse_str(&claims.sub)
         .map_err(|_| AppError::Authentication("Token contains invalid user ID".into()))?;
 
-    let user =
-        repos.user().find_by_id(user_id).await.map_err(|_| {
-            AppError::Authentication("User not found or inactive".into())
-        })?;
+    let user = repos
+        .user()
+        .find_by_id(user_id)
+        .await
+        .map_err(|_| AppError::Authentication("User not found or inactive".into()))?;
 
     if !user.is_active {
         return Err(AppError::Authentication("Account is not active".into()));
@@ -44,6 +46,23 @@ pub async fn require_auth(
 
     // Attach claims to request extensions
     request.extensions_mut().insert(claims);
+
+    // Continue to the handler
+    Ok(next.run(request).await)
+}
+
+// Admin role check middleware - requires require_auth middleware to run first
+pub async fn require_admin(request: Request, next: Next) -> Result<Response, AppError> {
+    // Get the claims from extensions (set by require_auth middleware)
+    let claims = request
+        .extensions()
+        .get::<Claims>()
+        .ok_or_else(|| AppError::Authorization("Authentication required".into()))?;
+
+    // Check if user has admin role
+    if claims.role != GLOBAL_ROLE_ADMIN {
+        return Err(AppError::Authorization("Admin access required".into()));
+    }
 
     // Continue to the handler
     Ok(next.run(request).await)

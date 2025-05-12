@@ -4,11 +4,13 @@ use argon2::{
 };
 use std::sync::Arc;
 use uuid::Uuid;
+use validator::Validate;
 
 use crate::db::error::{DatabaseError, DatabaseResult};
 use crate::db::repositories::UserRepository;
 use crate::errors::AppError;
 use crate::models::user::{CreateUserDto, UpdateUserDto, User, UserResponse};
+use crate::services::validation::validation_err_to_app_error;
 
 pub struct UserManagementService {
     user_repo: UserRepository,
@@ -21,6 +23,9 @@ impl UserManagementService {
 
     // Register new user
     pub async fn register_user(&self, dto: CreateUserDto) -> Result<User, AppError> {
+        // Validate DTO
+        dto.validate().map_err(validation_err_to_app_error)?;
+
         // Hash password using Argon2
         let password_hash = self.hash_password(&dto.password)?;
 
@@ -50,17 +55,17 @@ impl UserManagementService {
         page: u32,
         limit: u32,
     ) -> Result<(Vec<UserResponse>, u64), AppError> {
-        let limit = limit as i64;
-        let offset = (page as i64 - 1) * limit;
+        // Calculate offset from page
+        let offset = (page - 1) * limit;
 
-        // Get user data
+        // Get users
         let users = self
             .user_repo
-            .find_all(limit, offset)
+            .find_all(limit as i64, offset as i64)
             .await
             .map_err(AppError::Database)?;
 
-        // Get total user count for pagination
+        // Get total count
         let total = self.user_repo.count().await.map_err(AppError::Database)? as u64;
 
         // Convert to UserResponse
@@ -69,12 +74,16 @@ impl UserManagementService {
         Ok((user_responses, total))
     }
 
-    // Update user profile
+    // Update user data
     pub async fn update_user(
         &self,
         id: Uuid,
         dto: UpdateUserDto,
     ) -> Result<UserResponse, AppError> {
+        // Validate DTO
+        dto.validate().map_err(validation_err_to_app_error)?;
+
+        // Update user in database
         let user = self.user_repo.update(id, &dto).await.map_err(|e| match e {
             DatabaseError::NotFound => AppError::NotFound("User not found".into()),
             DatabaseError::Duplicate(msg) => AppError::Validation(msg),
@@ -91,6 +100,10 @@ impl UserManagementService {
         current_password: &str,
         new_password: &str,
     ) -> Result<(), AppError> {
+        // Validate new password
+        crate::services::validation::validate_password_strength(new_password)
+            .map_err(|e| AppError::Validation(e.to_string()))?;
+
         // Get user data
         let user = self.user_repo.find_by_id(id).await.map_err(|e| match e {
             DatabaseError::NotFound => AppError::NotFound("User not found".into()),

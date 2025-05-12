@@ -2,12 +2,15 @@ use chrono::{DateTime, NaiveDateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 use uuid::Uuid;
+use validator::{Validate, ValidationError};
+
+use crate::services::validation::{validate_email, validate_password_strength, validate_username};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct User {
     pub id: Uuid,
     pub email: String,
-    pub username: Option<String>,
+    pub username: String,
     #[serde(skip_serializing)]
     pub password_hash: String,
     pub full_name: Option<String>,
@@ -24,37 +27,52 @@ pub struct User {
 pub const GLOBAL_ROLE_ADMIN: &str = "ADMIN";
 pub const GLOBAL_ROLE_USER: &str = "USER";
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Validate)]
 pub struct CreateUserDto {
+    #[validate(custom = "validate_email")]
     pub email: String,
-    pub username: Option<String>,
+
+    #[validate(custom = "validate_username")]
+    pub username: String,
+
+    #[validate(custom = "validate_password_strength")]
     pub password: String,
+
     pub full_name: Option<String>,
     pub avatar_url: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Validate)]
 pub struct UpdateUserDto {
-    pub username: Option<String>,
+    #[validate(custom = "validate_username")]
+    pub username: String,
+
     pub full_name: Option<String>,
     pub avatar_url: Option<String>,
     pub is_active: Option<bool>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Validate)]
 pub struct LoginDto {
+    #[validate(custom = "validate_email")]
     pub email: String,
+
+    #[validate(length(min = 1, message = "Password cannot be empty"))]
     pub password: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Validate)]
 pub struct PasswordResetRequestDto {
+    #[validate(custom = "validate_email")]
     pub email: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Validate)]
 pub struct PasswordResetDto {
+    #[validate(length(min = 1, message = "Token is required"))]
     pub token: String,
+
+    #[validate(custom = "validate_password_strength")]
     pub new_password: String,
 }
 
@@ -62,7 +80,7 @@ pub struct PasswordResetDto {
 pub struct UserResponse {
     pub id: Uuid,
     pub email: String,
-    pub username: Option<String>,
+    pub username: String,
     pub full_name: Option<String>,
     pub avatar_url: Option<String>,
     pub global_role: String,

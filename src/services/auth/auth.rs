@@ -1,5 +1,6 @@
 use std::sync::Arc;
 use uuid::Uuid;
+use validator::Validate;
 
 use oauth2::{
     basic::BasicClient, AuthUrl, ClientId, ClientSecret, CsrfToken, RedirectUrl, Scope,
@@ -19,6 +20,7 @@ use crate::models::auth::token::{
 use crate::models::user::{AuthResponse, CreateUserDto, LoginDto, User, UserResponse};
 use crate::services::auth::token::TokenService;
 use crate::services::user::user_management::UserManagementService;
+use crate::services::validation::validation_err_to_app_error;
 
 pub struct AuthService {
     user_repo: UserRepository,
@@ -44,6 +46,9 @@ impl AuthService {
 
     // User login
     pub async fn login(&self, dto: &LoginDto) -> Result<AuthResponse, AppError> {
+        // Validate DTO
+        dto.validate().map_err(validation_err_to_app_error)?;
+
         // Find user by email
         let user = self
             .user_repo
@@ -130,6 +135,9 @@ impl AuthService {
         &self,
         dto: CreateUserDto,
     ) -> Result<(User, VerificationToken), AppError> {
+        // Validate DTO
+        dto.validate().map_err(validation_err_to_app_error)?;
+
         // Hash password
         let password_hash = self.user_management.hash_password(&dto.password)?;
 
@@ -204,6 +212,10 @@ impl AuthService {
 
     // Request password reset and generate token
     pub async fn request_password_reset(&self, email: &str) -> Result<VerificationToken, AppError> {
+        // Validate email format
+        crate::services::validation::validate_email(email)
+            .map_err(|e| AppError::Validation(e.to_string()))?;
+
         // Find user by email
         let user = self
             .user_repo
@@ -246,7 +258,11 @@ impl AuthService {
 
     // Reset password using token
     pub async fn reset_password(&self, token: &str, new_password: &str) -> Result<(), AppError> {
-        // Verify the token from the database
+        // Validate password
+        crate::services::validation::validate_password_strength(new_password)
+            .map_err(|e| AppError::Validation(e.to_string()))?;
+
+        // Verify the token
         let verification_token = self
             .token_repo
             .verify_token(token, TOKEN_TYPE_PASSWORD_RESET)
@@ -258,26 +274,20 @@ impl AuthService {
             .user_id
             .ok_or_else(|| AppError::InvalidToken("Token is not associated with a user".into()))?;
 
-        // Mark the token as used
-        self.token_repo
-            .mark_as_used(verification_token.id)
-            .await
-            .map_err(AppError::Database)?;
-
-        // Hash new password
+        // Hash the new password
         let password_hash = self.user_management.hash_password(new_password)?;
 
-        // Update user's password
+        // Update the user's password
         self.user_repo
             .update_password(user_id, &password_hash)
             .await
             .map_err(AppError::Database)?;
 
-        // Invalidate all other password reset tokens for this user
-        let _ = self
-            .token_repo
-            .invalidate_by_user_and_type(user_id, TOKEN_TYPE_PASSWORD_RESET)
-            .await;
+        // Mark the token as used
+        self.token_repo
+            .mark_as_used(verification_token.id)
+            .await
+            .map_err(AppError::Database)?;
 
         Ok(())
     }
@@ -340,7 +350,7 @@ impl AuthService {
                 // Create a new user
                 let mut create_user_dto = CreateUserDto {
                     email: email.clone(),
-                    username: Some(email.split('@').next().unwrap_or("user").to_string()),
+                    username: email.split('@').next().unwrap_or("user").to_string(),
                     password: self.generate_random_token(32)?, // Random password
                     full_name: Some(name),
                     avatar_url: avatar,
@@ -352,13 +362,12 @@ impl AuthService {
 
                 while self
                     .user_repo
-                    .find_by_username(&create_user_dto.username.as_ref().unwrap())
+                    .find_by_username(&create_user_dto.username)
                     .await
                     .is_ok()
                 {
                     attempt += 1;
-                    create_user_dto.username =
-                        Some(format!("{}_{}", username_base.clone().unwrap(), attempt));
+                    create_user_dto.username = format!("{}_{}", username_base.clone(), attempt);
                 }
 
                 // Hash the random password

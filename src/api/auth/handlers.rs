@@ -11,6 +11,7 @@ use axum::{
 use axum_extra::extract::TypedHeader;
 use axum_extra::headers::authorization::Bearer;
 use axum_extra::headers::Authorization;
+use validator::Validate;
 
 use super::routes::AuthApiState;
 use crate::errors::AppError;
@@ -19,6 +20,7 @@ use crate::models::response::{error_response, success_response, ErrorResponse};
 use crate::models::user::{
     AuthResponse, CreateUserDto, LoginDto, PasswordResetDto, PasswordResetRequestDto, UserResponse,
 };
+use crate::services::validation::validation_err_to_app_error;
 
 // Login handler
 pub async fn login(
@@ -32,6 +34,14 @@ pub async fn login(
             return error_response(StatusCode::BAD_REQUEST, format!("Invalid request: {}", err));
         }
     };
+
+    // Client-side validation
+    if let Err(err) = data.validate() {
+        return error_response(
+            StatusCode::BAD_REQUEST,
+            validation_err_to_app_error(err).to_string(),
+        );
+    }
 
     // Handle login
     match state.auth_service.login(&data.0).await {
@@ -52,6 +62,14 @@ pub async fn register(
             return error_response(StatusCode::BAD_REQUEST, format!("Invalid request: {}", err));
         }
     };
+
+    // Client-side validation
+    if let Err(err) = data.validate() {
+        return error_response(
+            StatusCode::BAD_REQUEST,
+            validation_err_to_app_error(err).to_string(),
+        );
+    }
 
     // Handle registration
     match state
@@ -139,6 +157,14 @@ pub async fn request_password_reset(
         }
     };
 
+    // Client-side validation
+    if let Err(err) = data.validate() {
+        return error_response(
+            StatusCode::BAD_REQUEST,
+            validation_err_to_app_error(err).to_string(),
+        );
+    }
+
     // Handle password reset request
     match state.auth_service.request_password_reset(&data.email).await {
         Ok(_) => {
@@ -176,6 +202,14 @@ pub async fn reset_password(
             return error_response(StatusCode::BAD_REQUEST, format!("Invalid request: {}", err));
         }
     };
+
+    // Client-side validation
+    if let Err(err) = data.validate() {
+        return error_response(
+            StatusCode::BAD_REQUEST,
+            validation_err_to_app_error(err).to_string(),
+        );
+    }
 
     // Handle password reset
     match state

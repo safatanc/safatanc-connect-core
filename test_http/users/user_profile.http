@@ -1,6 +1,6 @@
 ### Variables
 @baseUrl = http://localhost:8080
-@authToken = your_auth_token_here
+@authToken = eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIzZGI3Y2NhZi1hNmZmLTQ1ODgtODk4Ni1mY2ZhMjUwNzNjYTAiLCJleHAiOjE3NDcwMTYyNDYsImlhdCI6MTc0NzAxMjY0NiwiZW1haWwiOiJ0ZXN0QGV4YW1wbGUuY29tIiwicm9sZSI6InVzZXIifQ.DX9btmg8GB5r2rEgOdYvNHbo8ah-1Aafz01jwHYLt_k
 
 ### Get current logged-in user
 GET {{baseUrl}}/users/me
