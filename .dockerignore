@@ -1,0 +1,42 @@
+# Version control
+.git
+.gitignore
+
+# Rust build artifacts
+target/
+debug/
+**/*.rs.bk
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Environment files
+.env
+.env.*
+
+# Documentation
+README.md
+CHANGELOG.md
+docs/
+
+# Test files
+test_http/
+tests/
+
+# Temporary files
+tmp/
+temp/
+
+# Logs
+*.log
+
+# Docker files
+Dockerfile
+.dockerignore
+
+# Dependencies that will be reinstalled
+node_modules/
+vendor/ 
