@@ -32,6 +32,9 @@ pub enum AppError {
 
     #[error("Unexpected error: {0}")]
     Unexpected(String),
+
+    #[error("Configuration error: {0}")]
+    Configuration(String),
 }
 
 impl IntoResponse for AppError {
@@ -55,6 +58,7 @@ impl IntoResponse for AppError {
             AppError::Internal(msg) => (StatusCode::INTERNAL_SERVER_ERROR, msg),
             AppError::InvalidToken(msg) => (StatusCode::UNAUTHORIZED, msg),
             AppError::Unexpected(msg) => (StatusCode::INTERNAL_SERVER_ERROR, msg),
+            AppError::Configuration(msg) => (StatusCode::INTERNAL_SERVER_ERROR, msg),
         };
 
         ApiResponse::error(status, message)

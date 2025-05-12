@@ -7,15 +7,15 @@ mod models;
 mod services;
 mod utils;
 
-use std::net::SocketAddr;
 use std::sync::Arc;
 use tracing::{info, Level};
 use tracing_subscriber::FmtSubscriber;
 
+use db::repositories::OAuthRepository;
 use db::repositories::Repositories;
 use db::repositories::TokenRepository;
 use db::repositories::UserRepository;
-use services::auth::{AuthService, TokenService};
+use services::auth::{AuthService, OAuthService, TokenService};
 use services::badge::BadgeService;
 use services::scheduler::SchedulerService;
 use services::user::UserManagementService;
@@ -48,14 +48,29 @@ async fn main() -> anyhow::Result<()> {
     let token_service = Arc::new(TokenService::new(config.clone()));
     let user_repo = UserRepository::new(db_pool.as_ref().clone());
     let token_repo = TokenRepository::new(db_pool.as_ref().clone());
+    let oauth_repo = OAuthRepository::new(db_pool.as_ref().clone());
 
     let user_management_service = Arc::new(UserManagementService::new(user_repo.clone()));
-    let auth_service = Arc::new(AuthService::new(
-        user_repo,
-        token_repo,
+
+    // Initialize OAuth service
+    let oauth_service = Arc::new(OAuthService::new(
+        user_repo.clone(),
+        oauth_repo,
         token_service.clone(),
         user_management_service.clone(),
     ));
+
+    // Initialize Auth service with OAuth
+    let auth_service = Arc::new(
+        AuthService::new(
+            user_repo,
+            token_repo,
+            token_service.clone(),
+            user_management_service.clone(),
+        )
+        .with_oauth_service(oauth_service),
+    );
+
     let badge_service = Arc::new(BadgeService::new(repos.clone()));
     info!("Services initialized");
 
