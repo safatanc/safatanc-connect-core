@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use tokio::task;
 use uuid::Uuid;
 use validator::Validate;
 
@@ -86,26 +87,30 @@ impl AuthService {
             ));
         }
 
-        // Check if email is verified (optional, depends on your requirements)
         if !user.is_email_verified {
-            // You might want to allow login but with limited functionality, or require verification
-            // For this example, we'll log the user in but note they need to verify email
-            // In a real app, you might trigger email verification here
+            return Err(AppError::Authentication(
+                "Please verify your email address".into(),
+            ));
         }
 
-        // Update last login timestamp
-        let updated_user = self
-            .user_repo
-            .update_last_login(user.id)
-            .await
-            .map_err(AppError::Database)?;
+        // Clone user for the response
+        let response_user = user.clone();
 
         // Generate tokens
-        let (token, refresh_token) = self.token_service.generate_tokens(&updated_user)?;
+        let (token, refresh_token) = self.token_service.generate_tokens(&response_user)?;
+
+        // Update last login timestamp asynchronously
+        let user_repo = self.user_repo.clone();
+        let user_id = user.id;
+        tokio::spawn(async move {
+            if let Err(e) = user_repo.update_last_login(user_id).await {
+                tracing::error!("Failed to update last login timestamp: {}", e);
+            }
+        });
 
         // Create response
         let auth_response = AuthResponse {
-            user: UserResponse::from(updated_user),
+            user: UserResponse::from(response_user),
             token,
             refresh_token,
         };
@@ -147,20 +152,41 @@ impl AuthService {
             .user_id
             .ok_or_else(|| AppError::InvalidToken("Token is not associated with a user".into()))?;
 
-        // Update the user's email verification status
+        // Get the user data first
         let user = self
             .user_repo
-            .update_email_verification(user_id, true)
+            .find_by_id(user_id)
             .await
-            .map_err(AppError::Database)?;
+            .map_err(|e| match e {
+                DatabaseError::NotFound => AppError::NotFound("User not found".into()),
+                _ => AppError::Database(e),
+            })?;
 
-        // Mark the token as used
-        self.token_repo
-            .mark_as_used(verification_token.id)
-            .await
-            .map_err(AppError::Database)?;
+        // Check if already verified to avoid unnecessary updates
+        if !user.is_email_verified {
+            // Update the user's email verification status asynchronously
+            let user_repo = self.user_repo.clone();
+            let token_repo = self.token_repo.clone();
+            let token_id = verification_token.id;
 
-        Ok(UserResponse::from(user))
+            task::spawn(async move {
+                // Update email verification status
+                if let Err(e) = user_repo.update_email_verification(user_id, true).await {
+                    tracing::error!("Failed to update email verification status: {}", e);
+                }
+
+                // Mark the token as used
+                if let Err(e) = token_repo.mark_as_used(token_id).await {
+                    tracing::error!("Failed to mark token as used: {}", e);
+                }
+            });
+        }
+
+        // Return user with verified status for immediate response
+        let mut user_response = UserResponse::from(user);
+        user_response.is_email_verified = true;
+
+        Ok(user_response)
     }
 
     // Password reset request
@@ -221,17 +247,23 @@ impl AuthService {
         // Hash the new password
         let password_hash = self.user_management.hash_password(new_password)?;
 
-        // Update the user's password
-        self.user_repo
-            .update_password(user_id, &password_hash)
-            .await
-            .map_err(AppError::Database)?;
+        // Update password and mark token as used asynchronously
+        let user_repo = self.user_repo.clone();
+        let token_repo = self.token_repo.clone();
+        let token_id = verification_token.id;
 
-        // Mark the token as used
-        self.token_repo
-            .mark_as_used(verification_token.id)
-            .await
-            .map_err(AppError::Database)?;
+        // Spawn task to handle database updates
+        task::spawn(async move {
+            // Update the user's password
+            if let Err(e) = user_repo.update_password(user_id, &password_hash).await {
+                tracing::error!("Failed to update password: {}", e);
+            }
+
+            // Mark the token as used
+            if let Err(e) = token_repo.mark_as_used(token_id).await {
+                tracing::error!("Failed to mark token as used: {}", e);
+            }
+        });
 
         Ok(())
     }

@@ -14,7 +14,9 @@ use crate::errors::AppError;
 use crate::middleware::auth::Claims;
 use crate::models::auth::oauth::OAuthCallbackQuery;
 use crate::models::common::response::ApiResponse;
-use crate::models::user::{CreateUserDto, LoginDto, PasswordResetDto, UserResponse};
+use crate::models::user::{
+    CreateUserDto, LoginDto, PasswordResetDto, ResendVerificationEmailDto, UserResponse,
+};
 use crate::services::validation::validation_err_to_app_error;
 
 // Login handler
@@ -47,7 +49,7 @@ pub async fn register(
         .register_user(dto.clone())
         .await?;
 
-    // Send verification email
+    // Send verification email (non-blocking)
     state
         .email_service
         .send_verification_email(user.id, &user.email, &user.username)
@@ -131,7 +133,7 @@ pub async fn request_password_reset(
         .get_user_by_email(email)
         .await?;
 
-    // Send password reset email
+    // Send password reset email (non-blocking)
     state
         .email_service
         .send_password_reset_email(email, &user.username, &token)
@@ -140,6 +142,37 @@ pub async fn request_password_reset(
     Ok(ApiResponse::success(
         StatusCode::OK,
         "Password reset link sent if the email exists in our system",
+    ))
+}
+
+// Resend verification email handler
+pub async fn resend_verification_email(
+    Extension(claims): Extension<Claims>,
+    State(state): State<Arc<AuthApiState>>,
+) -> Result<Response, AppError> {
+    // Get user from claims
+    let user_id = claims.sub.parse().unwrap();
+    let user = state
+        .user_management_service
+        .get_user_by_id(user_id)
+        .await?;
+
+    // Check if email is already verified
+    if user.is_email_verified {
+        return Err(AppError::Validation(
+            "Email is already verified".to_string(),
+        ));
+    }
+
+    // Send verification email (non-blocking)
+    state
+        .email_service
+        .send_verification_email(user.id, &user.email, &user.username)
+        .await?;
+
+    Ok(ApiResponse::success(
+        StatusCode::OK,
+        "Verification email sent",
     ))
 }
 

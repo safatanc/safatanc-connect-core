@@ -7,7 +7,7 @@ use axum::{
 };
 
 use crate::db::repositories::Repositories;
-use crate::middleware::auth::{require_admin, require_auth};
+use crate::middleware::auth::{require_admin, require_auth, require_verified_email};
 use crate::services::auth::TokenService;
 use crate::services::badge::BadgeService;
 
@@ -48,6 +48,10 @@ pub fn configure(
     // Combine auth routes and apply auth middleware
     let auth_routes = admin_routes
         .merge(user_routes)
+        .route_layer(middleware::from_fn_with_state(
+            repo.clone(),
+            require_verified_email,
+        ))
         .route_layer(middleware::from_fn_with_state(
             (repo.clone(), token_service.clone()),
             require_auth,

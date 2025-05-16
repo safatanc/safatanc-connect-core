@@ -67,6 +67,12 @@ pub struct PasswordResetRequestDto {
 }
 
 #[derive(Debug, Deserialize, Validate)]
+pub struct ResendVerificationEmailDto {
+    #[validate(custom = "validate_email")]
+    pub email: String,
+}
+
+#[derive(Debug, Deserialize, Validate)]
 pub struct PasswordResetDto {
     #[validate(length(min = 1, message = "Token is required"))]
     pub token: String,

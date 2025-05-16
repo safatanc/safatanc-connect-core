@@ -7,7 +7,7 @@ use axum::{
 };
 
 use crate::db::repositories::Repositories;
-use crate::middleware::auth::require_auth;
+use crate::middleware::auth::{require_auth, require_verified_email};
 use crate::services::auth::{AuthService, TokenService};
 use crate::services::email::EmailService;
 use crate::services::user::UserManagementService;
@@ -51,15 +51,33 @@ pub fn configure(
         .route("/oauth/:provider", get(handlers::oauth_start))
         .route("/oauth/:provider/callback", get(handlers::oauth_callback));
 
-    // Auth required routes
-    let auth_routes = Router::new()
+    // Auth routes that don't require email verification
+    let unverified_auth_routes = Router::new()
+        .route(
+            "/resend-verification-email",
+            post(handlers::resend_verification_email),
+        )
+        .route_layer(middleware::from_fn_with_state(
+            (repos.clone(), token_service.clone()),
+            require_auth,
+        ));
+
+    // Auth routes that require email verification
+    let verified_auth_routes = Router::new()
         .route("/logout", post(handlers::logout))
         .route("/me", get(handlers::get_current_user))
+        .route_layer(middleware::from_fn_with_state(
+            repos.clone(),
+            require_verified_email,
+        ))
         .route_layer(middleware::from_fn_with_state(
             (repos, token_service),
             require_auth,
         ));
 
     // Merge all routes
-    public_routes.merge(auth_routes).with_state(state)
+    public_routes
+        .merge(unverified_auth_routes)
+        .merge(verified_auth_routes)
+        .with_state(state)
 }

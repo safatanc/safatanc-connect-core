@@ -50,6 +50,39 @@ pub async fn require_auth(
     Ok(next.run(request).await)
 }
 
+// Email verification middleware - requires require_auth middleware to run first
+pub async fn require_verified_email(
+    State(repos): State<Arc<Repositories>>,
+    request: Request,
+    next: Next,
+) -> Result<Response, AppError> {
+    // Get the claims from extensions (set by require_auth middleware)
+    let claims = request
+        .extensions()
+        .get::<Claims>()
+        .ok_or_else(|| AppError::Authorization("Authentication required".into()))?;
+
+    // Get user ID from claims
+    let user_id = Uuid::parse_str(&claims.sub)
+        .map_err(|_| AppError::Authentication("Invalid user ID".into()))?;
+
+    // Check if user's email is verified
+    let user = repos
+        .user()
+        .find_by_id(user_id)
+        .await
+        .map_err(|_| AppError::Authentication("User not found".into()))?;
+
+    if !user.is_email_verified {
+        return Err(AppError::Authorization(
+            "Email verification required".into(),
+        ));
+    }
+
+    // Continue to the handler
+    Ok(next.run(request).await)
+}
+
 // Admin role check middleware - requires require_auth middleware to run first
 pub async fn require_admin(request: Request, next: Next) -> Result<Response, AppError> {
     // Get the claims from extensions (set by require_auth middleware)

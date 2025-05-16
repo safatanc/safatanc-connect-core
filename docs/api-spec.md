@@ -16,6 +16,10 @@ The API uses JWT tokens for authentication. Most endpoints require a valid acces
 Authorization: Bearer <access_token>
 ```
 
+### Email Verification
+
+Many protected endpoints require email verification. Users can login without verifying their email, but will only have access to the `/auth/resend-verification-email` endpoint until they verify their email address. After verification, they gain access to all protected endpoints.
+
 ## Response Format
 
 All API responses follow a standard format:
@@ -103,7 +107,7 @@ POST /auth/register
 }
 ```
 
-**Note:** Upon successful registration, a verification email is automatically sent to the user's email address with instructions to verify their account.
+**Note:** Upon successful registration, a verification email is automatically sent to the user's email address with instructions to verify their account. Email sending happens asynchronously and won't delay the API response.
 
 #### Login with email/password
 
@@ -237,6 +241,24 @@ GET /auth/verify-email/:token
 }
 ```
 
+#### Resend Verification Email
+
+```
+POST /auth/resend-verification-email
+```
+
+**Authorization Required:** Yes
+
+**Response:** `200 OK`
+```json
+{
+  "success": true,
+  "data": "Verification email sent"
+}
+```
+
+**Note:** This endpoint is used by logged-in users who haven't verified their email yet. The verification email will be sent to the email address associated with the authenticated user. Email sending happens asynchronously and won't delay the API response.
+
 #### Request Password Reset
 
 ```
@@ -258,7 +280,7 @@ POST /auth/request-password-reset
 }
 ```
 
-**Note:** If the email exists in the system, a password reset email will be sent to the user's email address with a link to reset their password.
+**Note:** If the email exists in the system, a password reset email will be sent to the user's email address with a link to reset their password. Email sending happens asynchronously and won't delay the API response.
 
 #### Reset Password
 
@@ -407,7 +429,7 @@ POST /users
 }
 ```
 
-**Note:** Upon successful user creation, a verification email is automatically sent to the user's email address.
+**Note:** Upon successful user creation, a verification email is automatically sent to the user's email address. Email sending happens asynchronously and won't delay the API response.
 
 #### Get User by ID
 
@@ -838,7 +860,9 @@ GET /badges/users/:user_id/badges/:badge_id/check
 
 ## Email Configuration
 
-The application sends transactional emails for various events like user registration, email verification, and password reset. To enable email functionality, the following environment variables need to be configured:
+The application sends transactional emails for various events like user registration, email verification, and password reset. Emails are sent asynchronously to improve API response times - the API will respond immediately while email sending happens in the background.
+
+To enable email functionality, the following environment variables need to be configured:
 
 - `SMTP_HOST`: SMTP server hostname (default: smtp.gmail.com)
 - `SMTP_PORT`: SMTP server port (default: 587)
@@ -846,4 +870,4 @@ The application sends transactional emails for various events like user registra
 - `SMTP_PASSWORD`: Password for SMTP authentication
 - `SENDER_EMAIL`: Email address used as sender (default: noreply@safatanc-connect.com)
 - `SENDER_NAME`: Name displayed as sender (default: Safatanc Connect)
-- `FRONTEND_URL`: Base URL of the frontend application for email links 
+- `FRONTEND_URL`: Base URL of the frontend application for email links

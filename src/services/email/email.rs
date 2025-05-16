@@ -4,6 +4,7 @@ use lettre::{
     AsyncSmtpTransport, AsyncTransport, Message, Tokio1Executor,
 };
 use std::sync::Arc;
+use tokio::task;
 use uuid::Uuid;
 
 use crate::config::EmailConfig;
@@ -103,9 +104,15 @@ Safatanc Connect Team
             verification_url = verification_url
         );
 
-        // Send the email
-        self.send_email(email, subject, &html_content, &text_content)
-            .await
+        // Send the email asynchronously
+        self.send_email_async(
+            email.to_string(),
+            subject.to_string(),
+            html_content,
+            text_content,
+        );
+
+        Ok(())
     }
 
     // Send password reset email
@@ -170,12 +177,92 @@ Safatanc Connect Team
             reset_url = reset_url
         );
 
-        // Send the email
-        self.send_email(email, subject, &html_content, &text_content)
-            .await
+        // Send the email asynchronously
+        self.send_email_async(
+            email.to_string(),
+            subject.to_string(),
+            html_content,
+            text_content,
+        );
+
+        Ok(())
     }
 
-    // Generic send email function
+    // Send email asynchronously in a separate task
+    fn send_email_async(
+        &self,
+        to_email: String,
+        subject: String,
+        html_content: String,
+        text_content: String,
+    ) {
+        // Clone necessary data for the task
+        let email_config = self.email_config.clone();
+
+        // Spawn a new task to send the email
+        task::spawn(async move {
+            // Create transport inside the task
+            let transport = AsyncSmtpTransport::<Tokio1Executor>::relay(&email_config.smtp_host)
+                .unwrap_or_else(|e| {
+                    tracing::error!("Failed to create SMTP transport: {}", e);
+                    panic!("Failed to create SMTP transport: {}", e);
+                })
+                .port(email_config.smtp_port)
+                .credentials(Credentials::new(
+                    email_config.smtp_username,
+                    email_config.smtp_password,
+                ))
+                .build();
+
+            // Build email message
+            let email_result = Message::builder()
+                .from(
+                    format!(
+                        "{} <{}>",
+                        email_config.sender_name, email_config.sender_email
+                    )
+                    .parse()
+                    .unwrap_or_else(|e| {
+                        tracing::error!("Invalid sender email: {}", e);
+                        panic!("Invalid sender email: {}", e);
+                    }),
+                )
+                .to(to_email.parse().unwrap_or_else(|e| {
+                    tracing::error!("Invalid recipient email: {}", e);
+                    panic!("Invalid recipient email: {}", e);
+                }))
+                .subject(subject)
+                .multipart(
+                    MultiPart::alternative()
+                        .singlepart(
+                            SinglePart::builder()
+                                .header(ContentType::TEXT_PLAIN)
+                                .body(text_content),
+                        )
+                        .singlepart(
+                            SinglePart::builder()
+                                .header(ContentType::TEXT_HTML)
+                                .body(html_content),
+                        ),
+                );
+
+            match email_result {
+                Ok(email) => {
+                    // Send email
+                    if let Err(e) = transport.send(email).await {
+                        tracing::error!("Failed to send email: {}", e);
+                    } else {
+                        tracing::info!("Email sent successfully");
+                    }
+                }
+                Err(e) => {
+                    tracing::error!("Failed to build email: {}", e);
+                }
+            }
+        });
+    }
+
+    // Generic send email function (kept for backward compatibility)
     async fn send_email(
         &self,
         to_email: &str,

@@ -8,7 +8,7 @@ use axum::{
 
 use crate::config::AppConfig;
 use crate::db::repositories::Repositories;
-use crate::middleware::auth::{require_admin, require_auth};
+use crate::middleware::auth::{require_admin, require_auth, require_verified_email};
 use crate::services::auth::{AuthService, TokenService};
 use crate::services::user::UserManagementService;
 
@@ -40,6 +40,10 @@ pub fn configure(
     // Merge routes and apply authentication middleware to all
     admin_routes
         .merge(user_routes)
+        .route_layer(middleware::from_fn_with_state(
+            state.clone(),
+            require_verified_email,
+        ))
         .route_layer(middleware::from_fn_with_state(
             (state.clone(), token_service.clone()),
             require_auth,
