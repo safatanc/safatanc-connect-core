@@ -17,6 +17,7 @@ use crate::db::repositories::Repositories;
 use crate::models::common::response::ApiResponse;
 use crate::services::auth::{AuthService, TokenService};
 use crate::services::badge::BadgeService;
+use crate::services::email::EmailService;
 use crate::services::user::UserManagementService;
 
 // Handler for unmatched routes (404 Not Found)
@@ -32,6 +33,7 @@ pub fn configure_api(
     user_management_service: Arc<UserManagementService>,
     auth_service: Arc<AuthService>,
     badge_service: Arc<BadgeService>,
+    email_service: Arc<EmailService>,
 ) -> Router {
     // Configure CORS
     let cors = CorsLayer::new()
@@ -49,7 +51,7 @@ pub fn configure_api(
     Router::new()
         .nest(
             "/users",
-            users::configure_users(
+            users::configure(
                 state.clone(),
                 config.clone(),
                 user_management_service.clone(),
@@ -65,6 +67,7 @@ pub fn configure_api(
                 token_service.clone(),
                 user_management_service.clone(),
                 auth_service.clone(),
+                email_service.clone(),
             ),
         )
         // Add badge routes

@@ -103,6 +103,8 @@ POST /auth/register
 }
 ```
 
+**Note:** Upon successful registration, a verification email is automatically sent to the user's email address with instructions to verify their account.
+
 #### Login with email/password
 
 ```
@@ -215,6 +217,9 @@ GET /auth/me
 GET /auth/verify-email/:token
 ```
 
+**Parameters:**
+- `token`: Verification token received in the email
+
 **Response:** `200 OK`
 ```json
 {
@@ -252,6 +257,8 @@ POST /auth/request-password-reset
   "data": "Password reset link sent if the email exists in our system"
 }
 ```
+
+**Note:** If the email exists in the system, a password reset email will be sent to the user's email address with a link to reset their password.
 
 #### Reset Password
 
@@ -399,6 +406,8 @@ POST /users
   }
 }
 ```
+
+**Note:** Upon successful user creation, a verification email is automatically sent to the user's email address.
 
 #### Get User by ID
 
@@ -825,4 +834,16 @@ GET /badges/users/:user_id/badges/:badge_id/check
   "success": true,
   "data": true
 }
-``` 
+```
+
+## Email Configuration
+
+The application sends transactional emails for various events like user registration, email verification, and password reset. To enable email functionality, the following environment variables need to be configured:
+
+- `SMTP_HOST`: SMTP server hostname (default: smtp.gmail.com)
+- `SMTP_PORT`: SMTP server port (default: 587)
+- `SMTP_USERNAME`: Username for SMTP authentication
+- `SMTP_PASSWORD`: Password for SMTP authentication
+- `SENDER_EMAIL`: Email address used as sender (default: noreply@safatanc-connect.com)
+- `SENDER_NAME`: Name displayed as sender (default: Safatanc Connect)
+- `FRONTEND_URL`: Base URL of the frontend application for email links 

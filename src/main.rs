@@ -17,6 +17,7 @@ use db::repositories::TokenRepository;
 use db::repositories::UserRepository;
 use services::auth::{AuthService, OAuthService, TokenService};
 use services::badge::BadgeService;
+use services::email::EmailService;
 use services::scheduler::SchedulerService;
 use services::user::UserManagementService;
 
@@ -51,6 +52,10 @@ async fn main() -> anyhow::Result<()> {
     let oauth_repo = OAuthRepository::new(db_pool.as_ref().clone());
 
     let user_management_service = Arc::new(UserManagementService::new(user_repo.clone()));
+
+    // Initialize Email service
+    let email_service = Arc::new(EmailService::new(config.email.clone(), token_repo.clone()));
+    info!("Email service initialized");
 
     // Initialize OAuth service
     let oauth_service = Arc::new(OAuthService::new(
@@ -87,6 +92,7 @@ async fn main() -> anyhow::Result<()> {
         user_management_service.clone(),
         auth_service.clone(),
         badge_service.clone(),
+        email_service.clone(),
     );
     info!("API routes configured");
 

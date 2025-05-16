@@ -42,7 +42,16 @@ pub async fn register(
     dto.validate().map_err(validation_err_to_app_error)?;
 
     // Register the user
-    let user = state.user_management_service.register_user(dto).await?;
+    let user = state
+        .user_management_service
+        .register_user(dto.clone())
+        .await?;
+
+    // Send verification email
+    state
+        .email_service
+        .send_verification_email(user.id, &user.email, &user.username)
+        .await?;
 
     // Return registered user data
     Ok(ApiResponse::created(UserResponse::from(user)))
@@ -114,10 +123,20 @@ pub async fn request_password_reset(
         .ok_or_else(|| AppError::Validation("Email is required".to_string()))?;
 
     // Call service to request password reset
-    let _token = state.auth_service.request_password_reset(email).await?;
+    let token = state.auth_service.request_password_reset(email).await?;
 
-    // In a real application, you would send an email with the reset link
-    // For simplicity, we'll just acknowledge the request
+    // Get user by email
+    let user = state
+        .user_management_service
+        .get_user_by_email(email)
+        .await?;
+
+    // Send password reset email
+    state
+        .email_service
+        .send_password_reset_email(email, &user.username, &token)
+        .await?;
+
     Ok(ApiResponse::success(
         StatusCode::OK,
         "Password reset link sent if the email exists in our system",

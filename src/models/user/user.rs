@@ -26,7 +26,7 @@ pub struct User {
 pub const GLOBAL_ROLE_ADMIN: &str = "ADMIN";
 pub const GLOBAL_ROLE_USER: &str = "USER";
 
-#[derive(Debug, Deserialize, Validate)]
+#[derive(Debug, Clone, Deserialize, Validate)]
 pub struct CreateUserDto {
     #[validate(custom = "validate_email")]
     pub email: String,

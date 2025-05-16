@@ -48,6 +48,20 @@ impl UserManagementService {
         Ok(UserResponse::from(user))
     }
 
+    // Get user data by email
+    pub async fn get_user_by_email(&self, email: &str) -> Result<UserResponse, AppError> {
+        let user = self
+            .user_repo
+            .find_by_email(email)
+            .await
+            .map_err(|e| match e {
+                DatabaseError::NotFound => AppError::NotFound("User not found".into()),
+                _ => AppError::Database(e),
+            })?;
+
+        Ok(UserResponse::from(user))
+    }
+
     // Get all users with pagination
     pub async fn get_all_users(
         &self,

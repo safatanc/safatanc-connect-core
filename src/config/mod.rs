@@ -1,8 +1,10 @@
 mod app;
 mod database;
+mod email;
 
 pub use app::AppConfig;
 pub use database::DatabaseConfig;
+pub use email::EmailConfig;
 
 use dotenv::dotenv;
 
