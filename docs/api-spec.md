@@ -373,26 +373,15 @@ GET /auth/oauth/:provider/callback
 - `code`: Authorization code from provider
 - `state`: State parameter for security verification
 
-**Response:** `200 OK`
-```json
-{
-  "success": true,
-  "data": {
-    "user": {
-      "id": "uuid",
-      "email": "user@example.com",
-      "username": "username",
-      "full_name": "User Full Name",
-      "avatar_url": "https://example.com/avatar.jpg",
-      "global_role": "USER",
-      "is_email_verified": true,
-      "created_at": "2023-01-01T00:00:00Z"
-    },
-    "token": "jwt-token",
-    "refresh_token": "refresh-token"
-  }
-}
+**Response:** `302 Found` (Redirect)
+
+This endpoint redirects the user to the frontend application with the authentication tokens appended as query parameters:
+
 ```
+{frontend_url}/auth/callback?token={jwt-token}&refresh_token={refresh-token}
+```
+
+**Note:** Instead of returning a JSON response, this endpoint performs a redirect to the frontend application, passing the authentication tokens as query parameters for the client application to process.
 
 ### User Management
 
