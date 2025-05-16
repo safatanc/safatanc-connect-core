@@ -1,0 +1,16 @@
+EMAIL VERIFICATION
+
+Hello {{username}},
+
+Thank you for registering with Safatanc Connect. Please use the link below to verify your email address:
+
+{{verification_url}}
+
+This link will expire in 24 hours.
+
+If you didn't create an account, you can safely ignore this email.
+
+Best regards,
+Safatanc Connect Team
+
+© PT SAFATANC TECHNOLOGY DIGITAL 2025. All rights reserved. 

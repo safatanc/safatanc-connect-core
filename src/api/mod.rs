@@ -10,7 +10,7 @@ use axum::{
     response::IntoResponse,
     Router,
 };
-use tower_http::cors::{Any, CorsLayer};
+use tower_http::cors::{AllowOrigin, Any, CorsLayer};
 
 use crate::config::AppConfig;
 use crate::db::repositories::Repositories;
@@ -36,16 +36,37 @@ pub fn configure_api(
     email_service: Arc<EmailService>,
 ) -> Router {
     // Configure CORS
-    let cors = CorsLayer::new()
-        .allow_origin(Any)
-        .allow_methods([
-            Method::GET,
-            Method::POST,
-            Method::PUT,
-            Method::DELETE,
-            Method::OPTIONS,
-        ])
-        .allow_headers(Any);
+    let cors = if config.cors_allowed_origins.contains(&"*".to_string()) {
+        // If wildcard is allowed, use Any
+        CorsLayer::new()
+            .allow_origin(Any)
+            .allow_methods([
+                Method::GET,
+                Method::POST,
+                Method::PUT,
+                Method::DELETE,
+                Method::OPTIONS,
+            ])
+            .allow_headers(Any)
+    } else {
+        // Otherwise, configure specific origins
+        let origins = config
+            .cors_allowed_origins
+            .iter()
+            .filter_map(|origin| origin.parse().ok())
+            .collect::<Vec<_>>();
+
+        CorsLayer::new()
+            .allow_origin(AllowOrigin::list(origins))
+            .allow_methods([
+                Method::GET,
+                Method::POST,
+                Method::PUT,
+                Method::DELETE,
+                Method::OPTIONS,
+            ])
+            .allow_headers(Any)
+    };
 
     // Create main router and attach all sub-routers
     Router::new()

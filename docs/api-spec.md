@@ -5,7 +5,7 @@ This document outlines the API endpoints available in the Safatanc Connect Core 
 ## Base URL
 
 ```
-https://api.safatanc-connect.com/v1
+https://connect-core.safatanc.com
 ```
 
 ## Authentication
@@ -19,6 +19,24 @@ Authorization: Bearer <access_token>
 ### Email Verification
 
 Many protected endpoints require email verification. Users can login without verifying their email, but will only have access to the `/auth/resend-verification-email` endpoint until they verify their email address. After verification, they gain access to all protected endpoints.
+
+## CORS Configuration
+
+The API has CORS (Cross-Origin Resource Sharing) enabled, which can be configured via environment variables:
+
+```
+CORS_ALLOWED_ORIGINS=http://localhost:3000,https://connect.safatanc.com
+```
+
+- Use a comma-separated list of allowed origins
+- Use `*` to allow all origins (default if not specified)
+
+The API allows the following HTTP methods across all endpoints:
+- GET
+- POST
+- PUT
+- DELETE
+- OPTIONS
 
 ## Response Format
 

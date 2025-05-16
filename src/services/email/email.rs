@@ -3,6 +3,7 @@ use lettre::{
     transport::smtp::authentication::Credentials,
     AsyncSmtpTransport, AsyncTransport, Message, Tokio1Executor,
 };
+use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::task;
 use uuid::Uuid;
@@ -11,6 +12,7 @@ use crate::config::EmailConfig;
 use crate::db::repositories::TokenRepository;
 use crate::errors::AppError;
 use crate::models::auth::token::{CreateVerificationTokenDto, TOKEN_TYPE_EMAIL_VERIFICATION};
+use crate::services::email::template::TemplateManager;
 
 pub struct EmailService {
     email_config: EmailConfig,
@@ -55,54 +57,17 @@ impl EmailService {
             self.email_config.frontend_url, token
         );
 
+        // Create template parameters
+        let mut params = HashMap::new();
+        params.insert("username", username);
+        params.insert("verification_url", &verification_url);
+
+        // Render the email templates
+        let html_content = TemplateManager::render_html("verification", params.clone());
+        let text_content = TemplateManager::render_text("verification", params);
+
         // Email subject
         let subject = "Verify Your Email Address";
-
-        // Build HTML and text content
-        let html_content = format!(
-            r#"
-            <html>
-                <body>
-                    <h1>Email Verification</h1>
-                    <p>Hello {username},</p>
-                    <p>Thank you for registering with Safatanc Connect. 
-                    Please click the button below to verify your email address:</p>
-                    <p>
-                        <a href="{verification_url}" style="padding: 10px 15px; background-color: #4CAF50; color: white; text-decoration: none; border-radius: 5px;">
-                            Verify Email
-                        </a>
-                    </p>
-                    <p>If the button doesn't work, you can also copy and paste the following link into your browser:</p>
-                    <p>{verification_url}</p>
-                    <p>This link will expire in 24 hours.</p>
-                    <p>If you didn't create an account, you can safely ignore this email.</p>
-                    <p>Best regards,<br/>Safatanc Connect Team</p>
-                </body>
-            </html>
-            "#,
-            username = username,
-            verification_url = verification_url
-        );
-
-        let text_content = format!(
-            r#"Email Verification
-
-Hello {username},
-
-Thank you for registering with Safatanc Connect. Please use the link below to verify your email address:
-
-{verification_url}
-
-This link will expire in 24 hours.
-
-If you didn't create an account, you can safely ignore this email.
-
-Best regards,
-Safatanc Connect Team
-            "#,
-            username = username,
-            verification_url = verification_url
-        );
 
         // Send the email asynchronously
         self.send_email_async(
@@ -128,54 +93,17 @@ Safatanc Connect Team
             self.email_config.frontend_url, token
         );
 
+        // Create template parameters
+        let mut params = HashMap::new();
+        params.insert("username", username);
+        params.insert("reset_url", &reset_url);
+
+        // Render the email templates
+        let html_content = TemplateManager::render_html("password_reset", params.clone());
+        let text_content = TemplateManager::render_text("password_reset", params);
+
         // Email subject
         let subject = "Reset Your Password";
-
-        // Build HTML and text content
-        let html_content = format!(
-            r#"
-            <html>
-                <body>
-                    <h1>Password Reset</h1>
-                    <p>Hello {username},</p>
-                    <p>You have requested to reset your password. 
-                    Please click the button below to reset your password:</p>
-                    <p>
-                        <a href="{reset_url}" style="padding: 10px 15px; background-color: #4CAF50; color: white; text-decoration: none; border-radius: 5px;">
-                            Reset Password
-                        </a>
-                    </p>
-                    <p>If the button doesn't work, you can also copy and paste the following link into your browser:</p>
-                    <p>{reset_url}</p>
-                    <p>This link will expire in 24 hours.</p>
-                    <p>If you didn't request a password reset, you can safely ignore this email.</p>
-                    <p>Best regards,<br/>Safatanc Connect Team</p>
-                </body>
-            </html>
-            "#,
-            username = username,
-            reset_url = reset_url
-        );
-
-        let text_content = format!(
-            r#"Password Reset
-
-Hello {username},
-
-You have requested to reset your password. Please use the link below to reset your password:
-
-{reset_url}
-
-This link will expire in 24 hours.
-
-If you didn't request a password reset, you can safely ignore this email.
-
-Best regards,
-Safatanc Connect Team
-            "#,
-            username = username,
-            reset_url = reset_url
-        );
 
         // Send the email asynchronously
         self.send_email_async(
@@ -248,7 +176,7 @@ Safatanc Connect Team
 
             match email_result {
                 Ok(email) => {
-                    // Send email
+                    // Send the email
                     if let Err(e) = transport.send(email).await {
                         tracing::error!("Failed to send email: {}", e);
                     } else {
@@ -262,7 +190,7 @@ Safatanc Connect Team
         });
     }
 
-    // Generic send email function (kept for backward compatibility)
+    // Synchronous version of send_email (for cases where you want to wait for the email to be sent)
     async fn send_email(
         &self,
         to_email: &str,
@@ -270,7 +198,7 @@ Safatanc Connect Team
         html_content: &str,
         text_content: &str,
     ) -> Result<(), AppError> {
-        // Create email transport
+        // Create transport
         let transport = self.create_transport()?;
 
         // Build email message
@@ -281,11 +209,11 @@ Safatanc Connect Team
                     self.email_config.sender_name, self.email_config.sender_email
                 )
                 .parse()
-                .map_err(|e| AppError::Internal(format!("Invalid sender email: {}", e)))?,
+                .map_err(|e| AppError::Internal(format!("Failed to parse sender email: {}", e)))?,
             )
-            .to(to_email
-                .parse()
-                .map_err(|e| AppError::Internal(format!("Invalid recipient email: {}", e)))?)
+            .to(to_email.parse().map_err(|e| {
+                AppError::Internal(format!("Failed to parse recipient email: {}", e))
+            })?)
             .subject(subject)
             .multipart(
                 MultiPart::alternative()
@@ -302,7 +230,7 @@ Safatanc Connect Team
             )
             .map_err(|e| AppError::Internal(format!("Failed to build email: {}", e)))?;
 
-        // Send email
+        // Send the email
         transport
             .send(email)
             .await
@@ -311,29 +239,28 @@ Safatanc Connect Team
         Ok(())
     }
 
-    // Generate verification token
+    // Generate a verification token for email verification
     async fn generate_verification_token(&self, user_id: Uuid) -> Result<String, AppError> {
         // Generate a random token
         let token_string = self.generate_random_token(32)?;
 
-        // Create a verification token
+        // Create token DTO
         let token_dto = CreateVerificationTokenDto {
             user_id: Some(user_id),
             token_type: TOKEN_TYPE_EMAIL_VERIFICATION.to_string(),
             expires_in: 24 * 60 * 60, // 24 hours in seconds
         };
 
-        // Create token in database
-        let token = self
-            .token_repo
+        // Create token in the database
+        self.token_repo
             .create(&token_dto, &token_string)
             .await
-            .map_err(|e| AppError::Database(e))?;
+            .map_err(AppError::Database)?;
 
-        Ok(token.token)
+        Ok(token_string)
     }
 
-    // Generate random token
+    // Helper to generate random token
     fn generate_random_token(&self, length: usize) -> Result<String, AppError> {
         use rand::{distributions::Alphanumeric, Rng};
 

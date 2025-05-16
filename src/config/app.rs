@@ -10,10 +10,18 @@ pub struct AppConfig {
     pub jwt_secret: String,
     pub jwt_expiration: i64,           // in seconds
     pub refresh_token_expiration: i64, // in seconds
+    pub cors_allowed_origins: Vec<String>,
 }
 
 impl AppConfig {
     pub fn from_env() -> Self {
+        // Parse CORS origins from comma-separated list
+        let cors_origins = env::var("CORS_ALLOWED_ORIGINS")
+            .unwrap_or_else(|_| "*".to_string())
+            .split(',')
+            .map(|s| s.trim().to_string())
+            .collect::<Vec<String>>();
+
         Self {
             database: DatabaseConfig::from_env(),
             email: EmailConfig::from_env(),
@@ -31,6 +39,7 @@ impl AppConfig {
                 .unwrap_or_else(|_| "604800".to_string()) // 7 days
                 .parse()
                 .expect("REFRESH_TOKEN_EXPIRATION must be a number"),
+            cors_allowed_origins: cors_origins,
         }
     }
 }

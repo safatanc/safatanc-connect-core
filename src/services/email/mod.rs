@@ -1,3 +1,5 @@
-pub mod email;
+mod email;
+mod template;
 
-pub use self::email::EmailService;
+pub use email::EmailService;
+pub use template::TemplateManager;
