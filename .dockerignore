@@ -40,3 +40,5 @@ Dockerfile
 # Dependencies that will be reinstalled
 node_modules/
 vendor/ 
+
+docs/

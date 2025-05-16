@@ -288,7 +288,7 @@ impl OAuthService {
             .get(&provider.user_info_url)
             .header("Authorization", format!("Bearer {}", access_token))
             .header("Accept", "application/json")
-            .header("User-Agent", "SafaTanc-Connect")
+            .header("User-Agent", "Safatanc-Connect")
             .send()
             .await
             .map_err(|e| AppError::Unexpected(format!("Failed to fetch user info: {}", e)))?;
@@ -386,7 +386,7 @@ impl OAuthService {
         if provider.to_lowercase() == "github" {
             req = req
                 .header("Accept", "application/json")
-                .header("User-Agent", "SafaTanc-Connect");
+                .header("User-Agent", "Safatanc-Connect");
         }
 
         // Make the request
