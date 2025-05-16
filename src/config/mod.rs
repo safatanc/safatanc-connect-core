@@ -1,10 +1,12 @@
 mod app;
 mod database;
 mod email;
+mod oauth;
 
 pub use app::AppConfig;
 pub use database::DatabaseConfig;
 pub use email::EmailConfig;
+pub use oauth::OAuthConfig;
 
 use dotenv::dotenv;
 

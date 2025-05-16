@@ -8,6 +8,7 @@ use oauth2::{
 use reqwest::Client as HttpClient;
 use serde_json::Value;
 
+use crate::config::AppConfig;
 use crate::db::error::DatabaseError;
 use crate::db::repositories::{OAuthRepository, UserRepository};
 use crate::errors::AppError;
@@ -21,6 +22,7 @@ pub struct OAuthService {
     oauth_repo: OAuthRepository,
     token_service: Arc<TokenService>,
     user_management: Arc<UserManagementService>,
+    config: AppConfig,
 }
 
 impl OAuthService {
@@ -29,12 +31,14 @@ impl OAuthService {
         oauth_repo: OAuthRepository,
         token_service: Arc<TokenService>,
         user_management: Arc<UserManagementService>,
+        config: AppConfig,
     ) -> Self {
         Self {
             user_repo,
             oauth_repo,
             token_service,
             user_management,
+            config,
         }
     }
 
@@ -191,9 +195,8 @@ impl OAuthService {
         // Generate JWT tokens
         let token_pair = self.token_service.generate_tokens(&user)?;
 
-        // Create auth response
         let auth_response = AuthResponse {
-            user: UserResponse::from(user),
+            user: user.into(),
             token: token_pair.0,
             refresh_token: token_pair.1,
         };
@@ -226,11 +229,11 @@ impl OAuthService {
     fn create_oauth_client_fallback(&self, provider: &str) -> Result<BasicClient, AppError> {
         match provider.to_lowercase().as_str() {
             "google" => {
-                let client_id = "your-google-client-id.apps.googleusercontent.com";
-                let client_secret = "your-google-client-secret";
-                let auth_url = "https://accounts.google.com/o/oauth2/v2/auth";
-                let token_url = "https://oauth2.googleapis.com/token";
-                let redirect_url = "http://localhost:8080/api/auth/oauth/google/callback";
+                let client_id = &self.config.oauth.google_client_id;
+                let client_secret = &self.config.oauth.google_client_secret;
+                let auth_url = &self.config.oauth.google_auth_url;
+                let token_url = &self.config.oauth.google_token_url;
+                let redirect_url = &self.config.oauth.google_redirect_url;
 
                 Ok(BasicClient::new(
                     ClientId::new(client_id.to_string()),
@@ -241,11 +244,11 @@ impl OAuthService {
                 .set_redirect_uri(RedirectUrl::new(redirect_url.to_string()).unwrap()))
             }
             "github" => {
-                let client_id = "your-github-client-id";
-                let client_secret = "your-github-client-secret";
-                let auth_url = "https://github.com/login/oauth/authorize";
-                let token_url = "https://github.com/login/oauth/access_token";
-                let redirect_url = "http://localhost:8080/api/auth/oauth/github/callback";
+                let client_id = &self.config.oauth.github_client_id;
+                let client_secret = &self.config.oauth.github_client_secret;
+                let auth_url = &self.config.oauth.github_auth_url;
+                let token_url = &self.config.oauth.github_token_url;
+                let redirect_url = &self.config.oauth.github_redirect_url;
 
                 Ok(BasicClient::new(
                     ClientId::new(client_id.to_string()),
@@ -368,8 +371,8 @@ impl OAuthService {
     ) -> Result<(String, String, String, Option<String>), AppError> {
         let client = HttpClient::new();
         let url = match provider.to_lowercase().as_str() {
-            "google" => "https://www.googleapis.com/oauth2/v2/userinfo",
-            "github" => "https://api.github.com/user",
+            "google" => &self.config.oauth.google_user_info_url,
+            "github" => &self.config.oauth.github_user_info_url,
             _ => {
                 return Err(AppError::Validation(format!(
                     "Unsupported OAuth provider: {}",

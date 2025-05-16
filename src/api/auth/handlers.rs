@@ -4,7 +4,7 @@ use axum::extract::Extension;
 use axum::{
     extract::{Path, Query, State},
     http::StatusCode,
-    response::Response,
+    response::{IntoResponse, Redirect, Response},
     Json,
 };
 use validator::Validate;
@@ -242,5 +242,15 @@ pub async fn oauth_callback(
         .handle_oauth_callback(&provider, &query.code)
         .await?;
 
-    Ok(ApiResponse::success(StatusCode::OK, auth_response))
+    // Get frontend URL from config
+    let frontend_url = state.config.email.frontend_url.clone();
+
+    // Construct redirect URL with tokens
+    let redirect_url = format!(
+        "{}/auth/callback?token={}&refresh_token={}",
+        frontend_url, auth_response.token, auth_response.refresh_token
+    );
+
+    // Redirect to frontend with tokens
+    Ok(Redirect::to(&redirect_url).into_response())
 }

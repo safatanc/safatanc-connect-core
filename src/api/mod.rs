@@ -89,6 +89,7 @@ pub fn configure_api(
                 user_management_service.clone(),
                 auth_service.clone(),
                 email_service.clone(),
+                config.clone(),
             ),
         )
         // Add badge routes

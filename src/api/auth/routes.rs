@@ -6,6 +6,7 @@ use axum::{
     Router,
 };
 
+use crate::config::AppConfig;
 use crate::db::repositories::Repositories;
 use crate::middleware::auth::{require_auth, require_verified_email};
 use crate::services::auth::{AuthService, TokenService};
@@ -20,6 +21,7 @@ pub struct AuthApiState {
     pub user_management_service: Arc<UserManagementService>,
     pub auth_service: Arc<AuthService>,
     pub email_service: Arc<EmailService>,
+    pub config: AppConfig,
 }
 
 // Configure auth routes
@@ -29,12 +31,14 @@ pub fn configure(
     user_management_service: Arc<UserManagementService>,
     auth_service: Arc<AuthService>,
     email_service: Arc<EmailService>,
+    config: AppConfig,
 ) -> Router {
     let state = Arc::new(AuthApiState {
         token_service: token_service.clone(),
         user_management_service,
         auth_service,
         email_service,
+        config,
     });
 
     // Public routes - no auth required

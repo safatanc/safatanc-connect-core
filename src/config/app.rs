@@ -1,10 +1,11 @@
-use crate::config::{DatabaseConfig, EmailConfig};
+use crate::config::{DatabaseConfig, EmailConfig, OAuthConfig};
 use std::env;
 
 #[derive(Debug, Clone)]
 pub struct AppConfig {
     pub database: DatabaseConfig,
     pub email: EmailConfig,
+    pub oauth: OAuthConfig,
     pub server_host: String,
     pub server_port: u16,
     pub jwt_secret: String,
@@ -25,6 +26,7 @@ impl AppConfig {
         Self {
             database: DatabaseConfig::from_env(),
             email: EmailConfig::from_env(),
+            oauth: OAuthConfig::from_env(),
             server_host: env::var("SERVER_HOST").unwrap_or_else(|_| "127.0.0.1".to_string()),
             server_port: env::var("SERVER_PORT")
                 .unwrap_or_else(|_| "8080".to_string())

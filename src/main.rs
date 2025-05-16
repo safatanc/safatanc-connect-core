@@ -63,6 +63,7 @@ async fn main() -> anyhow::Result<()> {
         oauth_repo,
         token_service.clone(),
         user_management_service.clone(),
+        config.clone(),
     ));
 
     // Initialize Auth service with OAuth
