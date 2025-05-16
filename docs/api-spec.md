@@ -353,6 +353,9 @@ GET /auth/oauth/:provider
 **Parameters:**
 - `provider`: OAuth provider (e.g., "google", "github")
 
+**Query Parameters:**
+- `redirect_uri`: Optional custom redirect URI (default: `{frontend_url}/auth/callback`)
+
 **Response:** `200 OK`
 ```json
 {
@@ -363,6 +366,8 @@ GET /auth/oauth/:provider
 }
 ```
 
+**Note:** You can provide a custom `redirect_uri` parameter to specify where the user should be redirected after authentication. This can be either a relative path (which will be prefixed with the frontend URL) or an absolute URL. The authentication tokens will be appended as query parameters.
+
 #### OAuth Callback
 
 ```
@@ -372,16 +377,22 @@ GET /auth/oauth/:provider/callback
 **Query Parameters:**
 - `code`: Authorization code from provider
 - `state`: State parameter for security verification
+- `redirect_uri`: Optional custom redirect URI (overrides the one provided during login)
 
 **Response:** `302 Found` (Redirect)
 
-This endpoint redirects the user to the frontend application with the authentication tokens appended as query parameters:
+This endpoint redirects the user to the specified frontend application with the authentication tokens appended as query parameters. The redirect destination will be:
 
+1. If a `redirect_uri` is provided in the callback parameters, it will be used
+2. Otherwise, if a redirect was specified during the initial OAuth login request, that will be used
+3. If neither is provided, the default redirect will be `{frontend_url}/auth/callback`
+
+The tokens will be appended to the URL as query parameters:
 ```
-{frontend_url}/auth/callback?token={jwt-token}&refresh_token={refresh-token}
+{redirect_destination}?token={jwt-token}&refresh_token={refresh-token}
 ```
 
-**Note:** Instead of returning a JSON response, this endpoint performs a redirect to the frontend application, passing the authentication tokens as query parameters for the client application to process.
+**Note:** Instead of returning a JSON response, this endpoint performs a redirect to the configured destination, passing the authentication tokens as query parameters for the client application to process.
 
 ### User Management
 

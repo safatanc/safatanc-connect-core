@@ -12,7 +12,7 @@ use validator::Validate;
 use super::routes::AuthApiState;
 use crate::errors::AppError;
 use crate::middleware::auth::Claims;
-use crate::models::auth::oauth::OAuthCallbackQuery;
+use crate::models::auth::oauth::{OAuthCallbackQuery, OAuthStartQuery};
 use crate::models::common::response::ApiResponse;
 use crate::models::user::{
     CreateUserDto, LoginDto, PasswordResetDto, ResendVerificationEmailDto, UserResponse,
@@ -214,14 +214,33 @@ pub async fn get_current_user(
 // Handler to start the OAuth login process
 pub async fn oauth_start(
     Path(provider): Path<String>,
+    Query(query): Query<OAuthStartQuery>,
     State(state): State<Arc<AuthApiState>>,
 ) -> Result<Response, AppError> {
     // Get the authorization URL
     let redirect_url = state.auth_service.get_oauth_redirect_url(&provider).await?;
 
+    // Include the redirect_uri in the state if provided
+    let redirect_param = if let Some(redirect_uri) = &query.redirect_uri {
+        format!("&custom_redirect={}", urlencoding::encode(redirect_uri))
+    } else {
+        String::new()
+    };
+
+    // Append the redirect_uri to the URL
+    let final_url = if redirect_url.contains("?") {
+        format!("{}{}", redirect_url, redirect_param)
+    } else {
+        format!(
+            "{}?{}",
+            redirect_url,
+            redirect_param.trim_start_matches('&')
+        )
+    };
+
     Ok(ApiResponse::success(
         StatusCode::OK,
-        serde_json::json!({ "url": redirect_url }),
+        serde_json::json!({ "url": final_url }),
     ))
 }
 
@@ -236,6 +255,28 @@ pub async fn oauth_callback(
         return Err(AppError::Authentication(format!("OAuth error: {}", error)));
     }
 
+    // Parse the state param to extract custom_redirect if present
+    let custom_redirect = if let Some(state_param) = &query.state {
+        let state_parts: Vec<&str> = state_param.split('&').collect();
+        state_parts
+            .iter()
+            .find(|part| part.starts_with("custom_redirect="))
+            .map(|part| {
+                let encoded_uri = part.replace("custom_redirect=", "");
+                urlencoding::decode(&encoded_uri)
+                    .map(|s| s.to_string())
+                    .unwrap_or_default()
+            })
+    } else {
+        None
+    };
+
+    // Use the redirect_uri from the query if available (direct parameter takes precedence)
+    let redirect_path = query
+        .redirect_uri
+        .or(custom_redirect)
+        .unwrap_or_else(|| "/auth/callback".to_string());
+
     // Exchange code for token
     let auth_response = state
         .auth_service
@@ -246,10 +287,31 @@ pub async fn oauth_callback(
     let frontend_url = state.config.email.frontend_url.clone();
 
     // Construct redirect URL with tokens
-    let redirect_url = format!(
-        "{}/auth/callback?token={}&refresh_token={}",
-        frontend_url, auth_response.token, auth_response.refresh_token
-    );
+    // Make sure we don't double the domain if redirect_path is a full URL
+    let redirect_url =
+        if redirect_path.starts_with("http://") || redirect_path.starts_with("https://") {
+            // It's already a full URL, just append the tokens
+            if redirect_path.contains('?') {
+                format!(
+                    "{}&token={}&refresh_token={}",
+                    redirect_path, auth_response.token, auth_response.refresh_token
+                )
+            } else {
+                format!(
+                    "{}?token={}&refresh_token={}",
+                    redirect_path, auth_response.token, auth_response.refresh_token
+                )
+            }
+        } else {
+            // It's a relative path, prepend frontend_url
+            format!(
+                "{}/{}?token={}&refresh_token={}",
+                frontend_url.trim_end_matches('/'),
+                redirect_path.trim_start_matches('/'),
+                auth_response.token,
+                auth_response.refresh_token
+            )
+        };
 
     // Redirect to frontend with tokens
     Ok(Redirect::to(&redirect_url).into_response())

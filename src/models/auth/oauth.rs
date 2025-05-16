@@ -85,6 +85,12 @@ pub struct OAuthCallbackQuery {
     pub code: String,
     pub state: Option<String>,
     pub error: Option<String>,
+    pub redirect_uri: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct OAuthStartQuery {
+    pub redirect_uri: Option<String>,
 }
 
 #[derive(Debug, Serialize)]

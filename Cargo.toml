@@ -67,3 +67,4 @@ lettre = { version = "0.11", features = [
   "smtp-transport",
   "builder",
 ], default-features = false }
+urlencoding = "2.1.3"
