@@ -87,12 +87,6 @@ impl AuthService {
             ));
         }
 
-        if !user.is_email_verified {
-            return Err(AppError::Authentication(
-                "Please verify your email address".into(),
-            ));
-        }
-
         // Clone user for the response
         let response_user = user.clone();
 
@@ -164,29 +158,31 @@ impl AuthService {
 
         // Check if already verified to avoid unnecessary updates
         if !user.is_email_verified {
-            // Update the user's email verification status asynchronously
-            let user_repo = self.user_repo.clone();
-            let token_repo = self.token_repo.clone();
-            let token_id = verification_token.id;
-
-            task::spawn(async move {
-                // Update email verification status
-                if let Err(e) = user_repo.update_email_verification(user_id, true).await {
+            // Update the user's email verification status synchronously
+            let updated_user = self
+                .user_repo
+                .update_email_verification(user_id, true)
+                .await
+                .map_err(|e| {
                     tracing::error!("Failed to update email verification status: {}", e);
-                }
+                    AppError::Database(e)
+                })?;
 
-                // Mark the token as used
-                if let Err(e) = token_repo.mark_as_used(token_id).await {
+            // Mark the token as used synchronously
+            self.token_repo
+                .mark_as_used(verification_token.id)
+                .await
+                .map_err(|e| {
                     tracing::error!("Failed to mark token as used: {}", e);
-                }
-            });
+                    AppError::Database(e)
+                })?;
+
+            // Return updated user
+            return Ok(UserResponse::from(updated_user));
         }
 
-        // Return user with verified status for immediate response
-        let mut user_response = UserResponse::from(user);
-        user_response.is_email_verified = true;
-
-        Ok(user_response)
+        // If already verified, just return the user
+        Ok(UserResponse::from(user))
     }
 
     // Password reset request
