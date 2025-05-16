@@ -69,6 +69,22 @@ Paginated responses include metadata:
 }
 ```
 
+## Performance Optimizations
+
+### Asynchronous Processing
+
+The API implements several performance optimizations to ensure fast response times:
+
+1. **Asynchronous Email Sending**: All email operations (verification emails, password reset emails) are processed in the background after the API responds to the client.
+
+2. **Asynchronous User Updates**: The following operations are performed asynchronously:
+   - Login timestamp updates
+   - Email verification status updates
+   - Password reset operations
+   - Token usage marking
+
+These optimizations ensure that API responses are immediate, while database updates and email sending happen in the background.
+
 ## API Endpoints
 
 ### Authentication
@@ -143,6 +159,8 @@ POST /auth/login
   }
 }
 ```
+
+**Note:** Login timestamp is updated asynchronously and won't delay the API response.
 
 #### Refresh access token
 
@@ -241,6 +259,8 @@ GET /auth/verify-email/:token
 }
 ```
 
+**Note:** Email verification status is updated asynchronously and won't delay the API response.
+
 #### Resend Verification Email
 
 ```
@@ -303,6 +323,8 @@ POST /auth/reset-password
   "data": "Password reset successfully"
 }
 ```
+
+**Note:** Password updates and token invalidation happen asynchronously and won't delay the API response.
 
 #### OAuth Login
 
