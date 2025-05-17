@@ -271,47 +271,51 @@ pub async fn oauth_callback(
         None
     };
 
-    // Use the redirect_uri from the query if available (direct parameter takes precedence)
-    let redirect_path = query
-        .redirect_uri
-        .or(custom_redirect)
-        .unwrap_or_else(|| "/auth/callback".to_string());
-
     // Exchange code for token
     let auth_response = state
         .auth_service
         .handle_oauth_callback(&provider, &query.code)
         .await?;
 
-    // Get frontend URL from config
-    let frontend_url = state.config.email.frontend_url.clone();
-
-    // Construct redirect URL with tokens
-    // Make sure we don't double the domain if redirect_path is a full URL
-    let redirect_url =
-        if redirect_path.starts_with("http://") || redirect_path.starts_with("https://") {
-            // It's already a full URL, just append the tokens
-            if redirect_path.contains('?') {
-                format!(
-                    "{}&token={}&refresh_token={}",
-                    redirect_path, auth_response.token, auth_response.refresh_token
-                )
-            } else {
-                format!(
-                    "{}?token={}&refresh_token={}",
-                    redirect_path, auth_response.token, auth_response.refresh_token
-                )
-            }
-        } else {
-            // It's a relative path, prepend frontend_url
+    // Determine the redirect URL
+    // Priority:
+    // 1. redirect_uri from query parameters
+    // 2. custom_redirect from state parameter
+    // 3. Default to frontend_url
+    let redirect_url = if let Some(redirect_uri) = query.redirect_uri {
+        if redirect_uri.contains('?') {
             format!(
-                "{}/{}?token={}&refresh_token={}",
-                frontend_url.trim_end_matches('/'),
-                redirect_path.trim_start_matches('/'),
-                auth_response.token,
-                auth_response.refresh_token
+                "{}&token={}&refresh_token={}",
+                redirect_uri, auth_response.token, auth_response.refresh_token
             )
-        };
+        } else {
+            format!(
+                "{}?token={}&refresh_token={}",
+                redirect_uri, auth_response.token, auth_response.refresh_token
+            )
+        }
+    } else if let Some(custom_redirect) = custom_redirect {
+        if custom_redirect.contains('?') {
+            format!(
+                "{}&token={}&refresh_token={}",
+                custom_redirect, auth_response.token, auth_response.refresh_token
+            )
+        } else {
+            format!(
+                "{}?token={}&refresh_token={}",
+                custom_redirect, auth_response.token, auth_response.refresh_token
+            )
+        }
+    } else {
+        // Default to frontend URL with /auth/callback
+        let frontend_url = state.config.email.frontend_url.clone();
+        format!(
+            "{}/auth/callback?token={}&refresh_token={}",
+            frontend_url.trim_end_matches('/'),
+            auth_response.token,
+            auth_response.refresh_token
+        )
+    };
 
     // Redirect to frontend with tokens
     Ok(Redirect::to(&redirect_url).into_response())
