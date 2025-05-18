@@ -230,29 +230,24 @@ pub async fn oauth_start(
                 let state_parts: Vec<&str> = parts[1].split('&').collect();
                 let existing_state = state_parts[0];
 
-                // Create the new state parameter
+                // Create a new state that encodes both values
                 let custom_redirect = urlencoding::encode(redirect_uri).into_owned();
-                let new_state_param = if existing_state.is_empty() {
-                    format!("state=custom_redirect={}", custom_redirect)
+                let combined_state = if existing_state.is_empty() {
+                    custom_redirect
                 } else {
-                    format!(
-                        "state={}&custom_redirect={}",
-                        existing_state, custom_redirect
-                    )
+                    format!("{}_redirect_{}", existing_state, custom_redirect)
                 };
 
                 // Replace the state parameter
                 let old_state_param = format!("state={}", existing_state);
+                let new_state_param = format!("state={}", combined_state);
                 auth_url = auth_url.replacen(&old_state_param, &new_state_param, 1);
             }
         } else {
-            // Add state parameter with custom_redirect if no state exists
+            // Add state parameter with encoded redirect if no state exists
             let separator = if auth_url.contains('?') { '&' } else { '?' };
             let encoded_redirect = urlencoding::encode(redirect_uri).into_owned();
-            auth_url.push_str(&format!(
-                "{}state=custom_redirect={}",
-                separator, encoded_redirect
-            ));
+            auth_url.push_str(&format!("{}state={}", separator, encoded_redirect));
         }
     }
 
@@ -275,16 +270,18 @@ pub async fn oauth_callback(
 
     // Parse the state param to extract custom_redirect if present
     let custom_redirect = if let Some(state_param) = &query.state {
-        let state_parts: Vec<&str> = state_param.split('&').collect();
-        state_parts
-            .iter()
-            .find(|part| part.starts_with("custom_redirect="))
-            .map(|part| {
-                let encoded_uri = part.replace("custom_redirect=", "");
-                urlencoding::decode(&encoded_uri)
-                    .map(|s| s.to_string())
-                    .unwrap_or_default()
-            })
+        if state_param.contains("_redirect_") {
+            // Extract the redirect part after _redirect_ marker
+            let parts: Vec<&str> = state_param.split("_redirect_").collect();
+            if parts.len() > 1 {
+                urlencoding::decode(parts[1]).map(|s| s.to_string()).ok()
+            } else {
+                None
+            }
+        } else {
+            // The whole state might be the redirect URI
+            urlencoding::decode(state_param).map(|s| s.to_string()).ok()
+        }
     } else {
         None
     };
