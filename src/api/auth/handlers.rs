@@ -280,36 +280,25 @@ pub async fn oauth_callback(
     let frontend_url = state.config.email.frontend_url.clone();
 
     // Determine the redirect URL
-    // Priority:
-    // 1. redirect_uri from query parameters
-    // 2. custom_redirect from state parameter
-    // 3. Default to frontend_url
+    // Always redirect to frontend callback first, passing redirect_uri as a query parameter
     let redirect_url = if let Some(redirect_uri) = query.redirect_uri {
-        if redirect_uri.contains('?') {
-            format!(
-                "{}/auth/callback?redirect_uri={}&token={}&refresh_token={}",
-                frontend_url, redirect_uri, auth_response.token, auth_response.refresh_token
-            )
-        } else {
-            format!(
-                "{}/auth/callback?redirect_uri={}&token={}&refresh_token={}",
-                frontend_url, redirect_uri, auth_response.token, auth_response.refresh_token
-            )
-        }
+        format!(
+            "{}/auth/callback?redirect_uri={}&token={}&refresh_token={}",
+            frontend_url.trim_end_matches('/'),
+            urlencoding::encode(&redirect_uri),
+            auth_response.token,
+            auth_response.refresh_token
+        )
     } else if let Some(custom_redirect) = custom_redirect {
-        if custom_redirect.contains('?') {
-            format!(
-                "{}/auth/callback?redirect_uri={}&token={}&refresh_token={}",
-                frontend_url, custom_redirect, auth_response.token, auth_response.refresh_token
-            )
-        } else {
-            format!(
-                "{}/auth/callback?redirect_uri={}&token={}&refresh_token={}",
-                frontend_url, custom_redirect, auth_response.token, auth_response.refresh_token
-            )
-        }
+        format!(
+            "{}/auth/callback?redirect_uri={}&token={}&refresh_token={}",
+            frontend_url.trim_end_matches('/'),
+            urlencoding::encode(&custom_redirect),
+            auth_response.token,
+            auth_response.refresh_token
+        )
     } else {
-        // Default to frontend URL with /auth/callback
+        // Default to frontend URL with /auth/callback without redirect_uri
         format!(
             "{}/auth/callback?token={}&refresh_token={}",
             frontend_url.trim_end_matches('/'),
