@@ -287,24 +287,24 @@ pub async fn oauth_callback(
     let redirect_url = if let Some(redirect_uri) = query.redirect_uri {
         if redirect_uri.contains('?') {
             format!(
-                "{}/auth/callback{}&token={}&refresh_token={}",
+                "{}/auth/callback?redirect_uri={}&token={}&refresh_token={}",
                 frontend_url, redirect_uri, auth_response.token, auth_response.refresh_token
             )
         } else {
             format!(
-                "{}/auth/callback{}?token={}&refresh_token={}",
+                "{}/auth/callback?redirect_uri={}&token={}&refresh_token={}",
                 frontend_url, redirect_uri, auth_response.token, auth_response.refresh_token
             )
         }
     } else if let Some(custom_redirect) = custom_redirect {
         if custom_redirect.contains('?') {
             format!(
-                "{}/auth/callback{}&token={}&refresh_token={}",
+                "{}/auth/callback?redirect_uri={}&token={}&refresh_token={}",
                 frontend_url, custom_redirect, auth_response.token, auth_response.refresh_token
             )
         } else {
             format!(
-                "{}/auth/callback{}?token={}&refresh_token={}",
+                "{}/auth/callback?redirect_uri={}&token={}&refresh_token={}",
                 frontend_url, custom_redirect, auth_response.token, auth_response.refresh_token
             )
         }
