@@ -277,6 +277,8 @@ pub async fn oauth_callback(
         .handle_oauth_callback(&provider, &query.code)
         .await?;
 
+    let frontend_url = state.config.email.frontend_url.clone();
+
     // Determine the redirect URL
     // Priority:
     // 1. redirect_uri from query parameters
@@ -285,30 +287,29 @@ pub async fn oauth_callback(
     let redirect_url = if let Some(redirect_uri) = query.redirect_uri {
         if redirect_uri.contains('?') {
             format!(
-                "{}&token={}&refresh_token={}",
-                redirect_uri, auth_response.token, auth_response.refresh_token
+                "{}/auth/callback{}&token={}&refresh_token={}",
+                frontend_url, redirect_uri, auth_response.token, auth_response.refresh_token
             )
         } else {
             format!(
-                "{}?token={}&refresh_token={}",
-                redirect_uri, auth_response.token, auth_response.refresh_token
+                "{}/auth/callback{}?token={}&refresh_token={}",
+                frontend_url, redirect_uri, auth_response.token, auth_response.refresh_token
             )
         }
     } else if let Some(custom_redirect) = custom_redirect {
         if custom_redirect.contains('?') {
             format!(
-                "{}&token={}&refresh_token={}",
-                custom_redirect, auth_response.token, auth_response.refresh_token
+                "{}/auth/callback{}&token={}&refresh_token={}",
+                frontend_url, custom_redirect, auth_response.token, auth_response.refresh_token
             )
         } else {
             format!(
-                "{}?token={}&refresh_token={}",
-                custom_redirect, auth_response.token, auth_response.refresh_token
+                "{}/auth/callback{}?token={}&refresh_token={}",
+                frontend_url, custom_redirect, auth_response.token, auth_response.refresh_token
             )
         }
     } else {
         // Default to frontend URL with /auth/callback
-        let frontend_url = state.config.email.frontend_url.clone();
         format!(
             "{}/auth/callback?token={}&refresh_token={}",
             frontend_url.trim_end_matches('/'),
