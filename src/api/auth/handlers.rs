@@ -217,30 +217,48 @@ pub async fn oauth_start(
     Query(query): Query<OAuthStartQuery>,
     State(state): State<Arc<AuthApiState>>,
 ) -> Result<Response, AppError> {
-    // Get the authorization URL
-    let redirect_url = state.auth_service.get_oauth_redirect_url(&provider).await?;
+    // Get the authorization URL with a basic state parameter
+    let mut auth_url = state.auth_service.get_oauth_redirect_url(&provider).await?;
 
-    // Include the redirect_uri in the state if provided
-    let redirect_param = if let Some(redirect_uri) = &query.redirect_uri {
-        format!("&custom_redirect={}", urlencoding::encode(redirect_uri))
-    } else {
-        String::new()
-    };
+    // If redirect_uri is provided, modify the state parameter to include it
+    if let Some(redirect_uri) = &query.redirect_uri {
+        // Check if the URL already has a state parameter
+        if auth_url.contains("state=") {
+            // Extract the existing state value
+            let parts: Vec<&str> = auth_url.split("state=").collect();
+            if parts.len() > 1 {
+                let state_parts: Vec<&str> = parts[1].split('&').collect();
+                let existing_state = state_parts[0];
 
-    // Append the redirect_uri to the URL
-    let final_url = if redirect_url.contains("?") {
-        format!("{}{}", redirect_url, redirect_param)
-    } else {
-        format!(
-            "{}?{}",
-            redirect_url,
-            redirect_param.trim_start_matches('&')
-        )
-    };
+                // Create the new state parameter
+                let custom_redirect = urlencoding::encode(redirect_uri).into_owned();
+                let new_state_param = if existing_state.is_empty() {
+                    format!("state=custom_redirect={}", custom_redirect)
+                } else {
+                    format!(
+                        "state={}&custom_redirect={}",
+                        existing_state, custom_redirect
+                    )
+                };
+
+                // Replace the state parameter
+                let old_state_param = format!("state={}", existing_state);
+                auth_url = auth_url.replacen(&old_state_param, &new_state_param, 1);
+            }
+        } else {
+            // Add state parameter with custom_redirect if no state exists
+            let separator = if auth_url.contains('?') { '&' } else { '?' };
+            let encoded_redirect = urlencoding::encode(redirect_uri).into_owned();
+            auth_url.push_str(&format!(
+                "{}state=custom_redirect={}",
+                separator, encoded_redirect
+            ));
+        }
+    }
 
     Ok(ApiResponse::success(
         StatusCode::OK,
-        serde_json::json!({ "url": final_url }),
+        serde_json::json!({ "url": auth_url }),
     ))
 }
 
