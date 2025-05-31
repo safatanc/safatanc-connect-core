@@ -33,12 +33,14 @@ pub fn configure(
         .route("/me", get(handlers::get_current_user))
         .route("/me", put(handlers::update_current_user))
         .route("/me/password", put(handlers::update_current_user_password))
-        .route("/:id", get(handlers::get_user))
         .route("/:id", put(handlers::update_user))
         .route("/:id/password", put(handlers::update_user_password));
 
+    let public_routes = Router::new().route("/:id", get(handlers::get_user));
+
     // Merge routes and apply authentication middleware to all
-    admin_routes
+    public_routes
+        .merge(admin_routes)
         .merge(user_routes)
         .route_layer(middleware::from_fn_with_state(
             state.clone(),
