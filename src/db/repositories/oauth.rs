@@ -218,7 +218,7 @@ impl OAuthRepository {
         avatar_url: Option<&str>,
         access_token: Option<&str>,
         refresh_token: Option<&str>,
-        expires_at: Option<NaiveDateTime>,
+        expires_at: Option<DateTime<Utc>>,
         raw_user_info: Option<serde_json::Value>,
     ) -> DatabaseResult<UserOAuthConnection> {
         sqlx::query_as!(

@@ -1,4 +1,4 @@
-use chrono::NaiveDateTime;
+use chrono::{DateTime, Utc};
 use sqlx::{postgres::PgQueryResult, PgPool};
 use uuid::Uuid;
 
@@ -21,8 +21,8 @@ impl SessionRepository {
         user_id: Uuid,
         token: &str,
         refresh_token: Option<&str>,
-        expires_at: NaiveDateTime,
-        refresh_token_expires_at: Option<NaiveDateTime>,
+        expires_at: DateTime<Utc>,
+        refresh_token_expires_at: Option<DateTime<Utc>>,
         ip_address: Option<&str>,
         user_agent: Option<&str>,
         device_info: Option<serde_json::Value>,
@@ -184,8 +184,8 @@ impl SessionRepository {
         id: Uuid,
         new_token: &str,
         new_refresh_token: Option<&str>,
-        new_expires_at: NaiveDateTime,
-        new_refresh_token_expires_at: Option<NaiveDateTime>,
+        new_expires_at: DateTime<Utc>,
+        new_refresh_token_expires_at: Option<DateTime<Utc>>,
     ) -> DatabaseResult<Session> {
         let session = sqlx::query_as!(
             Session,

@@ -1,4 +1,4 @@
-use chrono::NaiveDateTime;
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 use uuid::Uuid;
@@ -9,28 +9,28 @@ pub struct Session {
     pub user_id: Uuid,
     pub token: String,
     pub refresh_token: Option<String>,
-    pub expires_at: NaiveDateTime,
-    pub refresh_token_expires_at: Option<NaiveDateTime>,
+    pub expires_at: DateTime<Utc>,
+    pub refresh_token_expires_at: Option<DateTime<Utc>>,
     pub ip_address: Option<String>,
     pub user_agent: Option<String>,
     pub device_info: Option<serde_json::Value>,
     pub is_active: bool,
-    pub last_activity_at: NaiveDateTime,
-    pub created_at: NaiveDateTime,
-    pub updated_at: NaiveDateTime,
+    pub last_activity_at: DateTime<Utc>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Serialize)]
 pub struct SessionResponse {
     pub id: Uuid,
     pub user_id: Uuid,
-    pub expires_at: NaiveDateTime,
+    pub expires_at: DateTime<Utc>,
     pub ip_address: Option<String>,
     pub user_agent: Option<String>,
     pub device_info: Option<serde_json::Value>,
     pub is_active: bool,
-    pub last_activity_at: NaiveDateTime,
-    pub created_at: NaiveDateTime,
+    pub last_activity_at: DateTime<Utc>,
+    pub created_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Serialize)]

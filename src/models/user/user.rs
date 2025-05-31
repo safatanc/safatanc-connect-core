@@ -1,4 +1,4 @@
-use chrono::NaiveDateTime;
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use validator::Validate;
@@ -17,10 +17,10 @@ pub struct User {
     pub global_role: String,
     pub is_email_verified: bool,
     pub is_active: bool,
-    pub last_login_at: Option<NaiveDateTime>,
-    pub created_at: NaiveDateTime,
-    pub updated_at: NaiveDateTime,
-    pub deleted_at: Option<NaiveDateTime>,
+    pub last_login_at: Option<DateTime<Utc>>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+    pub deleted_at: Option<DateTime<Utc>>,
 }
 
 pub const GLOBAL_ROLE_ADMIN: &str = "ADMIN";
@@ -99,7 +99,7 @@ pub struct UserResponse {
     pub avatar_url: Option<String>,
     pub global_role: String,
     pub is_email_verified: bool,
-    pub created_at: NaiveDateTime,
+    pub created_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Serialize)]
