@@ -1,5 +1,4 @@
 use std::sync::Arc;
-use uuid::Uuid;
 
 use oauth2::{
     basic::BasicClient, AuthUrl, ClientId, ClientSecret, CsrfToken, RedirectUrl, Scope,
@@ -12,8 +11,8 @@ use crate::config::AppConfig;
 use crate::db::error::DatabaseError;
 use crate::db::repositories::{OAuthRepository, UserRepository};
 use crate::errors::AppError;
-use crate::models::auth::oauth::{OAuthProvider, OAuthUrlResponse};
-use crate::models::user::{AuthResponse, CreateUserDto, User, UserResponse};
+use crate::models::auth::oauth::OAuthProvider;
+use crate::models::user::{AuthResponse, CreateUserDto};
 use crate::services::auth::token::TokenService;
 use crate::services::user::UserManagementService;
 
@@ -171,7 +170,7 @@ impl OAuthService {
             let expires_in = token_result.expires_in().map(|d| {
                 let now = chrono::Utc::now();
                 let expiry = now + d;
-                expiry.naive_utc()
+                expiry
             });
 
             // Store or update the OAuth connection

@@ -22,7 +22,7 @@ impl TokenRepository {
         token: &str,
     ) -> DatabaseResult<VerificationToken> {
         // Calculate expiration time
-        let expires_at = Utc::now().naive_utc() + Duration::seconds(dto.expires_in);
+        let expires_at = Utc::now() + Duration::seconds(dto.expires_in);
 
         sqlx::query_as!(
             VerificationToken,
@@ -114,7 +114,7 @@ impl TokenRepository {
 
     // Mark a token as used
     pub async fn mark_as_used(&self, token_id: Uuid) -> DatabaseResult<VerificationToken> {
-        let now = Utc::now().naive_utc();
+        let now = Utc::now();
 
         let token = sqlx::query_as!(
             VerificationToken,
@@ -144,7 +144,7 @@ impl TokenRepository {
         user_id: Uuid,
         token_type: &str,
     ) -> DatabaseResult<PgQueryResult> {
-        let now = Utc::now().naive_utc();
+        let now = Utc::now();
 
         sqlx::query!(
             r#"
