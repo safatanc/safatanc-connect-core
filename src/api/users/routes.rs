@@ -36,19 +36,29 @@ pub fn configure(
         .route("/:id", put(handlers::update_user))
         .route("/:id/password", put(handlers::update_user_password));
 
-    let public_routes = Router::new().route("/:id", get(handlers::get_user));
+    // Public routes that don't require authentication
+    let public_routes = Router::new()
+        .route("/:id", get(handlers::get_user))
+        .with_state((
+            state.clone(),
+            config.clone(),
+            user_management_service.clone(),
+            auth_service.clone(),
+        ));
 
-    // Merge routes and apply authentication middleware to all
-    public_routes
-        .merge(admin_routes)
+    // Merge authenticated routes and apply authentication middleware
+    let authenticated_routes = admin_routes
         .merge(user_routes)
         .route_layer(middleware::from_fn_with_state(
             state.clone(),
             require_verified_email,
         ))
         .route_layer(middleware::from_fn_with_state(
-            (state.clone(), token_service.clone()),
+            (state.clone(), token_service),
             require_auth,
         ))
-        .with_state((state, config, user_management_service, auth_service))
+        .with_state((state, config, user_management_service, auth_service));
+
+    // Merge public and authenticated routes without applying auth middleware to public routes
+    public_routes.merge(authenticated_routes)
 }
