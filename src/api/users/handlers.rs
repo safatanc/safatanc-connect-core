@@ -65,7 +65,6 @@ pub async fn get_current_user(
 
 // Get user by ID
 pub async fn get_user(
-    Extension(_claims): Extension<Claims>,
     Path(id): Path<Uuid>,
     State((_, _, user_management, _auth_service)): State<(
         Arc<Repositories>,
@@ -74,13 +73,6 @@ pub async fn get_user(
         Arc<AuthService>,
     )>,
 ) -> Result<Response, AppError> {
-    // Users can only access their own data, unless they are admin
-    if _claims.sub != id.to_string() && _claims.role != GLOBAL_ROLE_ADMIN {
-        return Err(crate::errors::AppError::Authorization(
-            "Access denied. You can only view your own data.".into(),
-        ));
-    }
-
     let user = user_management.get_user_by_id(id).await?;
     Ok(ApiResponse::success(StatusCode::OK, user))
 }
